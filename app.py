@@ -445,7 +445,7 @@ def server(input, output, session):
                 @output(id=out_id)
                 @render.data_frame
                 def _():
-                    df = filtered_data()
+                    df = bigquery_data()
                     
                     # Use a local variable for the query
                     position = pos_abbrev
