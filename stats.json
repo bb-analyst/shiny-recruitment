@@ -1,0 +1,70 @@
+{
+    "Always": {
+        "playerName":"Name",
+        "shirtNum":"Num",
+        "playerPositionAbbrev":"Pos",
+        "teamAbbr":"Team",
+        "roundName":"Round",
+        "roundId":"RID",
+        "mins":"Mins"
+    },
+    "Attack": {
+        "receipts":"Rec",
+        "allRuns":"Runs",
+        "allRunMetres":"Run Metres",
+        "postContactMetres":"PC Metres",
+        "kickReturns":"KR Runs",
+        "kickReturnMetres":"KR Metres",
+        "dummyHalfRuns":"DH Runs",
+        "dummyHalfRunMetres":"DH Metres",
+        "tries":"Try",
+        "tryAssists":"Try Ass",
+        "linebreaks":"LB",
+        "linebreakAssists":"LB Ass",
+        "tackleBreaks":"TB",
+        "supports":"Sup",
+        "offloads":"Offload",
+        "passes":"Pass",
+        "ptbAverage":"PTB Speed"
+    },
+    "Defence": {
+        "tackles":"Tk",
+        "missedTackles":"Miss Tk",
+        "ineffectiveTackles":"Ineff Tk",
+        "effectiveTacklePercentage":"Eff Tk %",
+        "forcedTurnover":"Forced Turnover",
+        "tryCause":"Try Cause",
+        "trySaves":"Try Save",
+        "kicksDefused":"Kick Def",
+        "kicksNotDefused":"Kick Not Def"
+    },
+    "Discipline": {
+        "errors":"Err",
+        "penalties":"Pen",
+        "ruckInfringements":"6A Ruck",
+        "setRestartConceded10mOffside":"6A Off"
+    },
+    "Kicking": {
+        "kicks":"Kick",
+        "kickMetres":"Kick Metres",
+        "kickTryAssist":"Kick Try Ass",
+        "kickLineBreak":"Kick LB",
+        "fortyTwentyKicks":"40/20",
+        "forcedDropOutKicker":"Forced DO",
+        "kickDead":"Kick Dead",
+        "allGoals":"Goals Made",
+        "allGoalsMissed":"Goals Mis",
+        "allGoalsAttempted":"Goals Att"
+    },
+    "Hidden": {
+        "playerId":"PID",
+        "playerPositionId":"PosID",
+        "playerPosition":"Position",
+        "teamId":"TID",
+        "teamName":"Team",
+        "teamNickName":"Team",
+        "teamHexColour":"Team Col 1",
+        "teamHexColour2":"Team Col 2",
+        "gameId":"GID"
+    }
+}

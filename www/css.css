@@ -1,0 +1,67 @@
+.navbar {
+    background-color: #540c2b !important;
+}
+
+.nav-link:hover {
+    color: #f0a91f !important;
+}
+
+.nav-link.active {
+    color: #f0a91f !important;
+}
+
+.navbar-brand:hover {
+    color: #f0a91f !important;
+}
+
+.nav-tabs .nav-link:not(.active) {
+    color: #540c2b !important;
+}
+
+.fixture-columns td:nth-child(1) {
+    width: 60px;
+    text-align: center;
+}
+.fixture-columns td:nth-child(2) {
+    width: auto;
+}
+.fixture-columns td:nth-child(3) {
+    width: 60px;
+    text-align: center;
+}
+.fixture-columns {
+    table-layout: fixed;
+    width: 100%;
+}
+
+/* Hide ALL table headers in leaderboard cards - try multiple selectors */
+.leaderboard-grid-card thead,
+.leaderboard-grid-card .shiny-data-grid thead,
+.leaderboard-grid-card table thead,
+.leaderboard-grid-card .table thead {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    line-height: 0 !important;
+    overflow: hidden !important;
+}
+
+/* Hide header cells specifically */
+.leaderboard-grid-card th {
+    display: none !important;
+}
+
+/* Hide footer */
+.leaderboard-grid-card tfoot,
+.leaderboard-grid-card .shiny-data-grid tfoot {
+    display: none !important;
+}
+
+/* Reduce card body padding */
+.leaderboard-grid-card .card-body {
+    padding: 0.25rem !important;
+}
+
+.row {
+    justify-content: center;
+}

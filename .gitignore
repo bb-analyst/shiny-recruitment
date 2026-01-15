@@ -1,0 +1,5 @@
+/.DS_Store
+/.env
+/.venv
+/pyproject.toml
+/recruitment_bq.json
