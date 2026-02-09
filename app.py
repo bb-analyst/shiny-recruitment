@@ -71,7 +71,7 @@ comps_dict = {
     161:'nrlw'
 }
 
-seasons_list = [2023,2024,2025]
+seasons_list = [2023,2024,2025,2026]
 
 summary_list = ['Game Average', 'Game Totals', 'Individual Games']
 
