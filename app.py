@@ -253,7 +253,7 @@ app_ui = ui.page_navbar(
             ui.input_selectize("season",
                 None,
                 choices=[str(i) for i in seasons_list],
-                selected='2025',
+                selected='2026',
                 multiple=False,
                 width='100px'
             ),
