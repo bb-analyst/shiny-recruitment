@@ -21,7 +21,7 @@ def fetch_bq_player_data(
         FROM `rugbaleeg.statsperform.player-match-stats`
         WHERE competitionId = @comp
           AND seasonId = @season
-          
+
     """
 
     job_config = bigquery.QueryJobConfig(
@@ -43,12 +43,20 @@ def fetch_bq_latest_fixtures(
 
     # Query to get all fixtures from the most recent past round of each competition
     query = """
-    WITH latest_rounds AS (
-        SELECT 
+    WITH round_first_game AS (
+        SELECT
+            competitionId,
+            roundStartDateUTC,
+            MIN(startTimeUTC) as first_game_time
+        FROM `rugbaleeg.statsperform.fixtures`
+        GROUP BY competitionId, roundStartDateUTC
+    ),
+    latest_rounds AS (
+        SELECT
             competitionId,
             MAX(roundStartDateUTC) as latest_round_date
-        FROM `rugbaleeg.statsperform.fixtures`
-        WHERE roundStartDateUTC <= CURRENT_TIMESTAMP()
+        FROM round_first_game
+        WHERE first_game_time <= CURRENT_TIMESTAMP()
         GROUP BY competitionId
     )
     SELECT f.*
