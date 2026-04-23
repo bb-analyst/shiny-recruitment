@@ -60,13 +60,45 @@ def summarise_filtered_data(df,summary_type,min_games,separate_positions,stats,f
 
         return df
 
-def leaderboard_df(df,stat,summary_type,min_games,top_n):
-    if summary_type == 'Game Average':
-        agg_func = {stat:'mean','roundId':'count'}
-    if summary_type == 'Game Totals':
-        agg_func = {stat:'sum','roundId':'count'}
+def leaderboard_df(df, stat, summary_type, min_games, top_n):
     if summary_type == 'Game Best':
-        agg_func = {stat:'max','roundId':'count'}
-    
-    df = df.groupby('playerName').agg(agg_func).rename(columns={stat:'Value','roundId':'MAT'}).query(f'MAT >= {min_games}').sort_values(by='Value',ascending=False).nlargest(top_n,'Value',keep='all').round(2).reset_index().drop(columns=['MAT'])
+        # Get the mins from the row where the stat was highest
+        df = df.query('mins > 0')
+        best_idx = df.groupby('playerName')[stat].idxmax()
+        mins_at_best = df.loc[best_idx, ['playerName', 'mins']].set_index('playerName')
+        
+        agg_func = {stat: 'max', 'roundId': 'count'}
+        df = (
+            df.groupby('playerName')
+            .agg(agg_func)
+            .join(mins_at_best)
+            .rename(columns={stat: 'Value', 'roundId': 'MAT'})
+            .query(f'MAT >= {min_games}')
+            .sort_values(by='Value', ascending=False)
+            .nlargest(top_n, 'Value', keep='all')
+            .round(2)
+            .reset_index()
+            .assign(playerName=lambda x: x['playerName'] + ' (' + x['MAT'].astype(int).astype(str) + ' | ' + x['mins'].astype(int).astype(str) + ' mins)')
+            .drop(columns=['MAT', 'mins'])
+        )
+        return df
+
+    if summary_type == 'Game Average':
+        agg_func = {stat: 'mean', 'roundId': 'count', 'mins': 'mean'}
+    if summary_type == 'Game Totals':
+        agg_func = {stat: 'sum', 'roundId': 'count', 'mins': 'sum'}
+
+    df = (
+        df.query('mins > 0')
+        .groupby('playerName')
+        .agg(agg_func)
+        .rename(columns={stat: 'Value', 'roundId': 'MAT'})
+        .query(f'MAT >= {min_games}')
+        .sort_values(by='Value', ascending=False)
+        .nlargest(top_n, 'Value', keep='all')
+        .round(2)
+        .reset_index()
+        .assign(playerName=lambda x: x['playerName'] + ' (' + x['MAT'].astype(int).astype(str) + ' | ' + x['mins'].astype(int).astype(str) + ' mins)')
+        .drop(columns=['MAT', 'mins'])
+    )
     return df

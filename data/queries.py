@@ -21,6 +21,7 @@ def fetch_bq_player_data(
         FROM `rugbaleeg.statsperform.player-match-stats`
         WHERE competitionId = @comp
           AND seasonId = @season
+          
     """
 
     job_config = bigquery.QueryJobConfig(
