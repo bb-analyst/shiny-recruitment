@@ -52,6 +52,8 @@ def summarise_filtered_data(df,summary_type,min_games,separate_positions,stats,f
         df.insert(loc=0, column='teamAbbr', value=teams)
         df.insert(loc=1, column='MAT', value=matches)
         
+        #filter min games
+        df = df.query("MAT >= @min_games")
         #reset index
         df = df.reset_index()
 
