@@ -33,7 +33,7 @@ def summarise_filtered_data(df,summary_type,min_games,separate_positions,stats,f
         else:
             group_cols = ['playerName']
         
-        if summary_type == 'Game Average':
+        if summary_type == 'Game Average' or summary_type == 'Per 80 Mins':
             agg_func = 'mean'
         if summary_type == 'Game Totals':
             # agg_func = 'sum'
@@ -47,6 +47,11 @@ def summarise_filtered_data(df,summary_type,min_games,separate_positions,stats,f
 
         #summarise df
         df = df.groupby(group_cols)[stats].agg(agg_func).round(2)
+
+        #80 minute conversion
+        if summary_type == 'Per 80 Mins':
+            per80_stats = [stat for stat in stats if stat != 'mins']
+            df[per80_stats] = (df[per80_stats].div(df['mins'], axis=0) * 80).round(2)
 
         #insert matches
         df.insert(loc=0, column='teamAbbr', value=teams)

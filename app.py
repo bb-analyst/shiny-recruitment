@@ -73,7 +73,7 @@ comps_dict = {
 
 seasons_list = [2023,2024,2025,2026]
 
-summary_list = ['Game Average', 'Game Totals', 'Individual Games']
+summary_list = ['Game Average', 'Game Totals', 'Per 80 Mins', 'Individual Games']
 
 positions_list = ['Fullback', 'Winger', 'Centre', 'Five-Eighth', 'Halfback',
                   'Hooker','Prop', '2nd Row', 'Lock', 'Interchange']
