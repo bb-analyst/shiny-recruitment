@@ -103,6 +103,36 @@ leaderboard_defaults = {
     'INT': ['tries','allRuns','tackles']
 }
 
+ranking_position_groups = [
+    'Halves', 'Hookers', 'Starting Middles', 
+    'Backrowers', 'Outside Backs', 'Bench'
+]
+
+ranking_methods = {
+    'percentile_rank': 'Percentile Rank',
+    'zscore': 'Z-Score',
+    'minmax': 'Min-Max'
+}
+
+ranking_defaults = {
+    'Halves':           ['tries_per80', 'tryAssists_per80', 'linebreaks_per80', 'kickMetres_per80', 'errors_per80'],
+    'Hookers':          ['tries_per80', 'tackleBreaks_per80', 'runs_per80', 'tackles_per80', 'errors_per80'],
+    'Starting Middles': ['metres_per80', 'runs_per80', 'postContactMetres_per80', 'tackleAttempts_per80', 'errors_per80'],
+    'Backrowers':       ['metres_per80', 'tackleBreaks_per80', 'offloads_per80', 'tackleAttempts_per80', 'errors_per80'],
+    'Outside Backs':    ['tries_per80', 'metres_per80', 'tackleBreaks_per80', 'kickDefusalPct', 'errors_per80'],
+    'Bench':            ['metres_per80', 'runs_per80', 'tackleAttempts_per80', 'errors_per80', 'sixAgains_per80'],
+}
+
+all_ranking_metrics = [
+    'tries_per80', 'tryAssists_per80', 'linebreaks_per80', 'linebreakAssists_per80',
+    'tackleBreaks_per80', 'runs_per80', 'metres_per80', 'postContactMetres_per80',
+    'offloads_per80', 'receipts_per80', 'supports_per80', 'halfbreaks_per80',
+    'tackleAttempts_per80', 'errors_per80', 'penalties_per80', 'sixAgains_per80',
+    'tackleEfficiency', 'ptbWinPct', 'postContactMetresPct', 'metresPerRun',
+    'postContactMetresPerRun', 'runsPerTackleBreak', 'kickReturnMetresperkickReturn',
+    'passesPerRun', 'receiptsPerError', 'kickDefusalPct', 'fastPtbPct', 'goalKickingPct'
+]
+
 def create_position_tabs():
     tabs = []
     for position_abbrev, default_stats in leaderboard_defaults.items():
@@ -117,6 +147,25 @@ def create_position_tabs():
                 width="100%"
             ),
             ui.output_ui(f"cards_{position_abbrev}")
+        )
+        tabs.append(tab)
+    return tabs
+
+
+def create_ranking_tabs():
+    tabs = []
+    for group in ranking_position_groups:
+        tab = ui.nav_panel(
+            group,
+            ui.input_selectize(
+                f"ranking_metrics_{group.replace(' ', '_')}",
+                "Metrics:",
+                choices=all_ranking_metrics,
+                selected=ranking_defaults[group],
+                multiple=True,
+                width="100%"
+            ),
+            ui.output_data_frame(f"ranking_table_{group.replace(' ', '_')}")
         )
         tabs.append(tab)
     return tabs
@@ -232,10 +281,31 @@ leaderboard_page = ui.nav_panel(
     )
 )
 
+rankings_page = ui.nav_panel(
+    "Season Rankings",
+    ui.h2("Season Rankings"),
+    ui.p("Season-to-date rankings normalised per 80 minutes. Minimum 200 minutes played."),
+    ui.layout_columns(
+        ui.input_select(
+            "ranking_method",
+            "Ranking Method:",
+            choices=ranking_methods,
+            selected='percentile_rank',
+            width="150px"
+        ),
+        col_widths=[4],
+        style="margin-bottom: 1rem;max-height: 50px;"
+    ),
+    ui.navset_tab(
+        *create_ranking_tabs()
+    )
+)
+
 app_ui = ui.page_navbar(
     home_page,
     table_page,
     leaderboard_page,
+    rankings_page,
     ui.nav_spacer(),
     ui.nav_control(
         ui.div(
@@ -275,6 +345,8 @@ def server(input, output, session):
         reactive.invalidate_later(7200) 
         df = queries.fetch_bq_latest_fixtures(client)
         return df.sort_values(by=['competitionName','roundId','gameNumber'])
+
+
 
     @render.ui
     def fixture_cards():
@@ -321,7 +393,16 @@ def server(input, output, session):
         stats = [k for c in stats_dict.keys() for k in stats_dict[c]]
         df = queries.fetch_bq_player_data(client, comp, season, stats)
         return df
-    
+
+    @reactive.calc
+    def rankings_data():
+        reactive.invalidate_later(86400)
+        comp = int(input.competition())
+        season = int(input.season())
+        if not comp or not season:
+            return pd.DataFrame()
+        return queries.fetch_bq_rankings_data(client, comp, season)
+
     #Update team choices when BigQuery data changes
     @reactive.effect
     def update_team_choices():
@@ -527,6 +608,30 @@ def server(input, output, session):
     @render.ui
     def cards_INT():
         return create_leaderboard_cards('INT')
+
+
+    # Helper to create pivoted rankings table for a position group
+    def create_ranking_table(group):
+        df = rankings_data()
+        if df is None or len(df) == 0:
+            return render.DataGrid(pd.DataFrame())
+
+        group_key = group.replace(' ', '_')
+        selected_metrics = list(input[f"ranking_metrics_{group_key}"]())
+        ranking_method = input.ranking_method()  # single shared input
+
+        final_df = processing.pivot_rankings_data(df, group, selected_metrics, ranking_method)
+
+        return render.DataGrid(final_df, width="100%", filters=False, summary=False)
+    # Register a render function for each position group
+    for _group in ranking_position_groups:
+        def make_ranking_renderer(g):
+            @output(id=f"ranking_table_{g.replace(' ', '_')}")
+            @render.data_frame
+            def _():
+                return create_ranking_table(g)
+            return _
+        make_ranking_renderer(_group)
 
 
 app_dir = Path(__file__).parent

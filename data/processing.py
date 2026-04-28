@@ -109,3 +109,74 @@ def leaderboard_df(df, stat, summary_type, min_games, top_n):
         .drop(columns=['MAT', 'mins'])
     )
     return df
+
+def pivot_rankings_data(df, group, selected_metrics, ranking_method):
+    """
+    Pivots long-format rankings data into wide format for display.
+    Returns a formatted dataframe with interleaved raw and rank columns.
+    """
+    if df is None or len(df) == 0:
+        return pd.DataFrame()
+
+    # Filter to position group and selected metrics
+    df = df[
+        (df['positionGroup'] == group) &
+        (df['metric'].isin(selected_metrics))
+    ]
+
+    if len(df) == 0:
+        return pd.DataFrame()
+
+    id_cols = ['playerId', 'playerName', 'positionGroup', 'gamesPlayed', 'totalMinutes']
+
+    # Pivot raw values
+    raw_pivot = df.pivot_table(
+        index=id_cols,
+        columns='metric',
+        values='raw_value',
+        aggfunc='first'
+    ).reset_index()
+    raw_pivot.columns = [
+        f"{c}_raw" if c not in id_cols else c
+        for c in raw_pivot.columns
+    ]
+
+    # Pivot ranking values
+    rank_pivot = df.pivot_table(
+        index=id_cols,
+        columns='metric',
+        values=ranking_method,
+        aggfunc='first'
+    ).reset_index()
+    rank_pivot.columns = [
+        f"{c}_rank" if c not in id_cols else c
+        for c in rank_pivot.columns
+    ]
+
+    # Merge
+    merged = raw_pivot.merge(rank_pivot, on=id_cols)
+
+    # Interleave columns: metric_raw, metric_rank for each selected metric
+    display_cols = ['playerName', 'gamesPlayed', 'totalMinutes']
+    metric_cols = []
+    for m in selected_metrics:
+        if f"{m}_raw" in merged.columns:
+            metric_cols.append(f"{m}_raw")
+        if f"{m}_rank" in merged.columns:
+            metric_cols.append(f"{m}_rank")
+
+    final_df = merged[display_cols + metric_cols].copy()
+
+    # Sort by first rank column descending
+    first_rank_col = next((c for c in metric_cols if c.endswith('_rank')), None)
+    if first_rank_col:
+        final_df = final_df.sort_values(by=first_rank_col, ascending=False)
+
+    # Round for display
+    for col in final_df.select_dtypes(include='float').columns:
+        if col.endswith('_rank'):
+            final_df[col] = final_df[col].round(2)
+        else:
+            final_df[col] = final_df[col].round(2)
+
+    return final_df.reset_index(drop=True)

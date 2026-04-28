@@ -70,3 +70,23 @@ def fetch_bq_latest_fixtures(
     job = client.query(query)
     job.result()
     return job.to_dataframe()
+
+
+def fetch_bq_rankings_data(client, comp_id, season):
+    query = """
+        SELECT 
+            playerId, playerName, positionGroup,
+            competitionId, competitionName, seasonId,
+            gamesPlayed, totalMinutes,
+            metric, raw_value, percentile_rank, zscore, minmax
+        FROM `rugbaleeg.statsperform.season_derived_rankings`
+        WHERE competitionId = @comp_id
+          AND seasonId = @season
+    """
+    job_config = bigquery.QueryJobConfig(
+        query_parameters=[
+            bigquery.ScalarQueryParameter("comp_id", "INT64", comp_id),
+            bigquery.ScalarQueryParameter("season",  "INT64", season),
+        ]
+    )
+    return client.query(query, job_config=job_config).to_dataframe()
