@@ -65,6 +65,7 @@ comps_dict = {
     121:'superleague',
     143:'haroldmatthews',
     144:'sgball',
+    153:'nrlq',
     154:'cyrilconnell',
     155:'malmeninga',
     159:'jerseyflegg',
