@@ -1,4 +1,4 @@
-from shiny import App, ui, render, reactive
+from shiny import App, ui, render, reactive, req
 from shinyswatch import theme
 import pandas as pd
 import plotly.express as px
@@ -313,8 +313,8 @@ app_ui = ui.page_navbar(
             ui.input_selectize("competition",
                 None,
                 choices={str(i):j for i,j in comps_dict.items()},
-                selected='111',
-                multiple=False,
+                selected=['111'],
+                multiple=True,
                 width='100px'
             ),
         )        
@@ -324,8 +324,8 @@ app_ui = ui.page_navbar(
             ui.input_selectize("season",
                 None,
                 choices=[str(i) for i in seasons_list],
-                selected='2026',
-                multiple=False,
+                selected=['2026'],
+                multiple=True,
                 width='100px'
             ),
         )
@@ -387,22 +387,20 @@ def server(input, output, session):
     @reactive.calc
     def bigquery_data():
         reactive.invalidate_later(86400)
-        comp = int(input.competition())
-        season = int(input.season())
-        if not comp or not season:
-            return pd.DataFrame()
+        comps = [int(c) for c in input.competition()]
+        seasons = [int(s) for s in input.season()]
+        req(comps, seasons)  # silently stops execution if either is empty
         stats = [k for c in stats_dict.keys() for k in stats_dict[c]]
-        df = queries.fetch_bq_player_data(client, comp, season, stats)
+        df = queries.fetch_bq_player_data(client, comps, seasons, stats)
         return df
 
     @reactive.calc
     def rankings_data():
         reactive.invalidate_later(86400)
-        comp = int(input.competition())
-        season = int(input.season())
-        if not comp or not season:
-            return pd.DataFrame()
-        return queries.fetch_bq_rankings_data(client, comp, season)
+        comps = [int(c) for c in input.competition()]
+        seasons = [int(s) for s in input.season()]
+        req(comps, seasons)
+        return queries.fetch_bq_rankings_data(client, comps, seasons)
 
     #Update team choices when BigQuery data changes
     @reactive.effect

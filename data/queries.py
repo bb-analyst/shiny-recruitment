@@ -9,25 +9,52 @@ def get_client():
     credentials = service_account.Credentials.from_service_account_file(str(key_path))
     return bigquery.Client(credentials=credentials)
 
+# def fetch_bq_player_data(
+#     client: bigquery.Client,
+#     comp: int,
+#     season: int,
+#     stats: list[str],
+# ) -> pd.DataFrame:
+
+#     query = f"""
+#         SELECT {', '.join(stats)}
+#         FROM `rugbaleeg.statsperform.player-match-stats`
+#         WHERE competitionId = @comp
+#           AND seasonId = @season
+
+#     """
+
+#     job_config = bigquery.QueryJobConfig(
+#         query_parameters=[
+#             bigquery.ScalarQueryParameter("comp", "INT64", int(comp)),
+#             bigquery.ScalarQueryParameter("season", "INT64", int(season)),
+#         ]
+#     )
+
+#     job = client.query(query, job_config=job_config)
+#     job.result()
+
+#     return job.to_dataframe()
+
+
 def fetch_bq_player_data(
     client: bigquery.Client,
-    comp: int,
-    season: int,
+    comps: list[int],
+    seasons: list[int],
     stats: list[str],
 ) -> pd.DataFrame:
 
     query = f"""
         SELECT {', '.join(stats)}
         FROM `rugbaleeg.statsperform.player-match-stats`
-        WHERE competitionId = @comp
-          AND seasonId = @season
-
+        WHERE competitionId IN UNNEST(@comps)
+          AND seasonId IN UNNEST(@seasons)
     """
 
     job_config = bigquery.QueryJobConfig(
         query_parameters=[
-            bigquery.ScalarQueryParameter("comp", "INT64", int(comp)),
-            bigquery.ScalarQueryParameter("season", "INT64", int(season)),
+            bigquery.ArrayQueryParameter("comps", "INT64", [int(c) for c in comps]),
+            bigquery.ArrayQueryParameter("seasons", "INT64", [int(s) for s in seasons]),
         ]
     )
 
@@ -35,6 +62,7 @@ def fetch_bq_player_data(
     job.result()
 
     return job.to_dataframe()
+
 
 def fetch_bq_latest_fixtures(
     client: bigquery.Client
@@ -72,7 +100,7 @@ def fetch_bq_latest_fixtures(
     return job.to_dataframe()
 
 
-def fetch_bq_rankings_data(client, comp_id, season):
+def fetch_bq_rankings_data(client, comps, seasons):
     query = """
         SELECT 
             playerId, playerName, positionGroup,
@@ -80,13 +108,13 @@ def fetch_bq_rankings_data(client, comp_id, season):
             gamesPlayed, totalMinutes,
             metric, raw_value, percentile_rank, zscore, minmax
         FROM `rugbaleeg.statsperform.season_derived_rankings`
-        WHERE competitionId = @comp_id
-          AND seasonId = @season
+        WHERE competitionId IN UNNEST(@comps)
+          AND seasonId IN UNNEST(@seasons)
     """
     job_config = bigquery.QueryJobConfig(
         query_parameters=[
-            bigquery.ScalarQueryParameter("comp_id", "INT64", comp_id),
-            bigquery.ScalarQueryParameter("season",  "INT64", season),
+            bigquery.ArrayQueryParameter("comps", "INT64", [int(c) for c in comps]),
+            bigquery.ArrayQueryParameter("seasons", "INT64", [int(s) for s in seasons]),
         ]
     )
     return client.query(query, job_config=job_config).to_dataframe()

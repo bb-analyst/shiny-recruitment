@@ -65,6 +65,8 @@
         "teamNickName":"Team",
         "teamHexColour":"Team Col 1",
         "teamHexColour2":"Team Col 2",
-        "gameId":"GID"
+        "gameId":"GID",
+        "seasonId":"Seas",
+        "competitionName":"Comp"
     }
 }
