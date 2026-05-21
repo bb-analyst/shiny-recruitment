@@ -315,7 +315,7 @@ app_ui = ui.page_navbar(
                 choices={str(i):j for i,j in comps_dict.items()},
                 selected=['111'],
                 multiple=True,
-                width='100px'
+                width='200px'
             ),
         )        
     ),
@@ -326,7 +326,7 @@ app_ui = ui.page_navbar(
                 choices=[str(i) for i in seasons_list],
                 selected=['2026'],
                 multiple=True,
-                width='100px'
+                width='200px'
             ),
         )
     ),
