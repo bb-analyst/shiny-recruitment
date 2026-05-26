@@ -84,7 +84,7 @@ with open("stats.json", "r") as f:
 
 stats_flattened_dict = {k: v for d in stats_dict.values() for k, v in d.items()}
 
-default_stats = ['allRuns','allRunMetres',
+default_stats = ['Rating','allRuns','allRunMetres',
                  'tries','tryAssists',
                  'linebreaks','linebreakAssists',
                  'tackleBreaks',
@@ -142,7 +142,7 @@ def create_position_tabs():
             ui.input_selectize(
                 f"stats_{position_abbrev}",  # Use code as ID
                 None,
-                choices={category:stats_dict[category] for category in ['Attack','Defence','Discipline','Kicking']},
+                choices={category:stats_dict[category] for category in ['Derived','Attack','Defence','Discipline','Kicking']},
                 selected=default_stats,
                 multiple=True,
                 width="100%"
@@ -245,7 +245,7 @@ table_page = ui.nav_panel(
             ui.hr(style="margin-top: 0px; margin-bottom: 0px;"),
             ui.input_selectize("stats",
                             "Stats:",
-                            choices={category:stats_dict[category] for category in ['Attack','Defence','Discipline','Kicking']},
+                            choices={category:stats_dict[category] for category in ['Derived','Attack','Defence','Discipline','Kicking']},
                             selected=default_stats,
                             multiple=True)
         ),
@@ -383,15 +383,17 @@ def server(input, output, session):
 
 
     
-    #Fetch data from BigQuery when comp or season changes
+    #Fetch data from BigQuery when comp or season changes and calculate rating
     @reactive.calc
     def bigquery_data():
         reactive.invalidate_later(86400)
         comps = [int(c) for c in input.competition()]
         seasons = [int(s) for s in input.season()]
         req(comps, seasons)  # silently stops execution if either is empty
-        stats = [k for c in stats_dict.keys() for k in stats_dict[c]]
+        stats = [k for c in stats_dict.keys() if c != "Derived" for k in stats_dict[c]]
         df = queries.fetch_bq_player_data(client, comps, seasons, stats)
+        df = processing.calculate_rating(df)
+        print(df['Rating'])
         return df
 
     @reactive.calc
@@ -449,6 +451,7 @@ def server(input, output, session):
         players = [int(p) for p in players] if players else None
         positions = input.position()
         stats = list(input.stats())
+        print(stats)
         stats = list(stats_dict['Always'].keys()) + stats
 
         #Filter

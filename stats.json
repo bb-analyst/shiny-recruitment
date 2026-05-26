@@ -8,6 +8,9 @@
         "roundId":"RID",
         "mins":"Mins"
     },
+    "Derived": {
+        "Rating":"Rate"
+    },
     "Attack": {
         "receipts":"Rec",
         "allRuns":"Runs",
