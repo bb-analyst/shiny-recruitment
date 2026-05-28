@@ -6,7 +6,9 @@
         "teamAbbr":"Team",
         "roundName":"Round",
         "roundId":"RID",
-        "mins":"Mins"
+        "mins":"Mins",
+        "seasonId":"Year",
+        "competitionName":"Comp"
     },
     "Derived": {
         "Rating":"Rate"
@@ -68,8 +70,6 @@
         "teamNickName":"Team",
         "teamHexColour":"Team Col 1",
         "teamHexColour2":"Team Col 2",
-        "gameId":"GID",
-        "seasonId":"Seas",
-        "competitionName":"Comp"
+        "gameId":"GID"
     }
 }

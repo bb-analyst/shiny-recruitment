@@ -242,6 +242,12 @@ table_page = ui.nav_panel(
             ui.input_checkbox("position_separate",
                             "Separate Positions", 
                             value=False),
+            ui.input_checkbox("season_separate",
+                            "Separate Seasons", 
+                            value=False),
+            ui.input_checkbox("comp_separate",
+                            "Separate Comps", 
+                            value=False),
             ui.hr(style="margin-top: 0px; margin-bottom: 0px;"),
             ui.input_selectize("stats",
                             "Stats:",
@@ -473,6 +479,8 @@ def server(input, output, session):
         summary_type = input.summary()
         min_games = input.min_games()
         separate_positions = input.position_separate()
+        separate_seasons = input.season_separate()
+        separate_comps = input.comp_separate()
         stats = list(input.stats())
         stats = ['mins'] + stats
         summarised_df = processing.summarise_filtered_data(
@@ -480,6 +488,8 @@ def server(input, output, session):
             summary_type,
             min_games,
             separate_positions,
+            separate_seasons,
+            separate_comps,
             stats,
             stats_flattened_dict
         )

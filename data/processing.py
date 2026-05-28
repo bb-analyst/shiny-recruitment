@@ -25,7 +25,7 @@ def filter_bq_player_data(df,game_types,teams=None,players=None,positions=None,s
 
     return df.query("mins > 0").sort_values(by=['playerName','roundId'])
 
-def summarise_filtered_data(df,summary_type,min_games,separate_positions,stats,flat_dict):
+def summarise_filtered_data(df,summary_type,min_games,separate_positions,separate_seasons,separate_comps,stats,flat_dict):
     
     
     if summary_type == 'Individual Games':
@@ -34,10 +34,13 @@ def summarise_filtered_data(df,summary_type,min_games,separate_positions,stats,f
         df = df.rename(columns=flat_dict)
         return df
     else:
+        group_cols = ['playerName']
+        if separate_comps:
+            group_cols.append('competitionName')
+        if separate_seasons:
+            group_cols.append('seasonId')
         if separate_positions:
-            group_cols = ['playerName','playerPositionAbbrev']
-        else:
-            group_cols = ['playerName']
+            group_cols.append('playerPositionAbbrev')
         
         if summary_type == 'Game Average' or summary_type == 'Per 80 Mins':
             agg_func = 'mean'
