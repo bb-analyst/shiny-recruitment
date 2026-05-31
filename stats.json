@@ -1,5 +1,6 @@
 {
     "Always": {
+        "playerId":"PID",
         "playerName":"Name",
         "shirtNum":"Num",
         "playerPositionAbbrev":"Pos",
@@ -62,7 +63,6 @@
         "allGoalsAttempted":"Goals Att"
     },
     "Hidden": {
-        "playerId":"PID",
         "playerPositionId":"PosID",
         "playerPosition":"Position",
         "teamId":"TID",

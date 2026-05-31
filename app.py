@@ -35,7 +35,7 @@ service_account_info = {
 }
 credentials = service_account.Credentials.from_service_account_info(service_account_info)
 client = bigquery.Client(credentials=credentials)
-
+contracts_df = queries.fetch_bq_contract_data(client)
 
 #Constants
 # comps_dict = {
@@ -52,6 +52,12 @@ client = bigquery.Client(credentials=credentials)
 #     'nrlw': 161
 # }
 #Constants
+
+CONTRACT_END_COLORS = {
+    2026: "#FF4444",  # red
+    2027: "#E6970A",  # amber
+}
+
 broncos_maroon = '#540c2b'
 broncos_gold = '#f0a91f'
 
@@ -399,7 +405,6 @@ def server(input, output, session):
         stats = [k for c in stats_dict.keys() if c != "Derived" for k in stats_dict[c]]
         df = queries.fetch_bq_player_data(client, comps, seasons, stats)
         df = processing.calculate_rating(df)
-        print(df['Rating'])
         return df
 
     @reactive.calc
@@ -457,7 +462,6 @@ def server(input, output, session):
         players = [int(p) for p in players] if players else None
         positions = input.position()
         stats = list(input.stats())
-        print(stats)
         stats = list(stats_dict['Always'].keys()) + stats
 
         #Filter
@@ -493,16 +497,38 @@ def server(input, output, session):
             stats,
             stats_flattened_dict
         )
-
+        summarised_df = processing.add_contract_info(summarised_df, contracts_df)
         return summarised_df
     
     @output
     @render.data_frame
     def player_table():
         df = summarised_data()
-        return render.DataGrid(
-            df,
-        )
+
+        styles = []
+        for year, color in CONTRACT_END_COLORS.items():
+            matching_rows = df.index[df["all_contract_end"] == year].tolist()
+            if matching_rows:
+                styles.append(
+                    render.StyleInfo(
+                        rows=matching_rows,
+                        cols=["Name"],
+                        style={"color": color, "font-weight": "bold"},
+                    )
+                )
+
+        unsigned_rows = df.index[df["all_contract_end"].isna()].tolist()
+        if unsigned_rows:
+            styles.append(
+                render.StyleInfo(
+                    rows=unsigned_rows,
+                    cols=["Name"],
+                    style={"color":"#999999","font-weight": "bold"},
+                )
+            )
+        display_df = df.drop(columns=["PID","all_contract_end"], errors="ignore")
+
+        return render.DataGrid(display_df, styles=styles)
 
     # Helper function to create leaderboard cards
     def create_leaderboard_cards(position_abbrev):

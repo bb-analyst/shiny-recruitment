@@ -6,6 +6,14 @@ def calculate_rating(df):
     df['Rating'] = (df[stat_cols].mul(equivalent_ratings.loc[stat_cols, 'stat_weight']).sum(axis=1) * 100).round(0)
     return df
 
+def add_contract_info(df: pd.DataFrame, contracts_df: pd.DataFrame) -> pd.DataFrame:
+    return df.merge(
+        contracts_df[['player_id','all_contract_end']],
+        left_on="PID",
+        right_on="player_id",
+        how="left"
+    ).drop(columns=["player_id"])
+
 def filter_bq_player_data(df,game_types,teams=None,players=None,positions=None,stats=None):
     
     #filter dataframe
@@ -29,12 +37,12 @@ def summarise_filtered_data(df,summary_type,min_games,separate_positions,separat
     
     
     if summary_type == 'Individual Games':
-        index_cols = ['playerName','roundName','teamAbbr','playerPositionAbbrev']
+        index_cols = ['playerId','playerName','roundName','teamAbbr','playerPositionAbbrev']
         df = df[index_cols + stats]
         df = df.rename(columns=flat_dict)
         return df
     else:
-        group_cols = ['playerName']
+        group_cols = ['playerId','playerName']
         if separate_comps:
             group_cols.append('competitionName')
         if separate_seasons:

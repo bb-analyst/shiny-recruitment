@@ -9,33 +9,18 @@ def get_client():
     credentials = service_account.Credentials.from_service_account_file(str(key_path))
     return bigquery.Client(credentials=credentials)
 
-# def fetch_bq_player_data(
-#     client: bigquery.Client,
-#     comp: int,
-#     season: int,
-#     stats: list[str],
-# ) -> pd.DataFrame:
+def fetch_bq_contract_data(
+    client: bigquery.Client,
+    current_year: int = 2026
+) -> pd.DataFrame:
+    
+    query = f"""
+        SELECT *
+        FROM `rugbaleeg.statsperform.contracts`
+        WHERE contract_year = {current_year}
+    """
 
-#     query = f"""
-#         SELECT {', '.join(stats)}
-#         FROM `rugbaleeg.statsperform.player-match-stats`
-#         WHERE competitionId = @comp
-#           AND seasonId = @season
-
-#     """
-
-#     job_config = bigquery.QueryJobConfig(
-#         query_parameters=[
-#             bigquery.ScalarQueryParameter("comp", "INT64", int(comp)),
-#             bigquery.ScalarQueryParameter("season", "INT64", int(season)),
-#         ]
-#     )
-
-#     job = client.query(query, job_config=job_config)
-#     job.result()
-
-#     return job.to_dataframe()
-
+    return client.query(query).to_dataframe()
 
 def fetch_bq_player_data(
     client: bigquery.Client,
