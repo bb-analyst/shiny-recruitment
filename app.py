@@ -295,11 +295,11 @@ table_page = ui.nav_panel(
 
             /* Header cells */
             #player_table table thead th:not(:first-child) {
-                min-height: 100px !important;
-                height: auto !important;
+                height: 100px !important;
                 padding-top: 20px !important;
                 padding-bottom: 10px !important;
                 vertical-align: bottom !important;
+                text-align: center !important;
             }
 
             /* Rotated header text */
@@ -309,14 +309,13 @@ table_page = ui.nav_panel(
                 transform: rotate(180deg) !important;
 
                 display: flex !important;
-                align-items: center !important;
-                justify-content: flex-start !important;
 
-                width: 100% !important;
-                height: 100% !important;
+                justify-content: flex-start !important;
+                align-items: center !important;
+
+                margin: 0 auto !important;
 
                 white-space: nowrap !important;
-                text-align: center !important;
             }
         """),
         ui.output_data_frame("player_table")
