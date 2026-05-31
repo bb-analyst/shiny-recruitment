@@ -261,6 +261,64 @@ table_page = ui.nav_panel(
                             selected=default_stats,
                             multiple=True)
         ),
+        # Custom CSS
+        ui.tags.style("""
+            #player_table table {
+                width: max-content !important;
+                table-layout: auto !important;
+            }
+
+            /* Never wrap names */
+            #player_table table th:first-child,
+            #player_table table td:first-child {
+                width: 180px !important;
+                min-width: 180px !important;
+                max-width: 180px !important;
+
+                white-space: nowrap !important;
+                overflow: hidden !important;
+                text-overflow: ellipsis !important;
+
+                padding-left: 4px !important;
+                padding-right: 12px !important;
+            }
+
+            /* Compact numeric columns */
+            #player_table table th:not(:first-child),
+            #player_table table td:not(:first-child) {
+                white-space: nowrap !important;
+                width: 1% !important;
+                padding-left: 8px !important;
+                padding-right: 8px !important;
+                text-align: center !important;
+            }
+
+            /* Header cells */
+            #player_table table thead th:not(:first-child) {
+                min-height: 100px !important;
+                height: auto !important;
+                padding-top: 20px !important;
+                padding-bottom: 10px !important;
+                vertical-align: bottom !important;
+            }
+
+            /* Rotated header text */
+            #player_table table thead th:not(:first-child) div,
+            #player_table table thead th:not(:first-child) span {
+                writing-mode: vertical-rl !important;
+                transform: rotate(180deg) !important;
+
+                display: flex !important;
+                align-items: center !important;
+                justify-content: flex-start !important;
+
+                width: 100% !important;
+                height: 100% !important;
+
+                white-space: nowrap !important;
+                text-align: center !important;
+            }
+        """),
         ui.output_data_frame("player_table")
     )
 )
@@ -528,7 +586,7 @@ def server(input, output, session):
             )
         display_df = df.drop(columns=["PID","all_contract_end"], errors="ignore")
 
-        return render.DataGrid(display_df, styles=styles)
+        return render.DataTable(display_df, styles=styles,width="100%",height="99%")
 
     # Helper function to create leaderboard cards
     def create_leaderboard_cards(position_abbrev):
