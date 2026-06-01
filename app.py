@@ -1043,10 +1043,9 @@ def server(input, output, session):
     # Download player table
     # -------------------------
 
-    @render.download(
-        filename=lambda: "player_table.xlsx"
-    )
+    @render.download(filename="player_table.xlsx")
     def download_player_table():
+        from io import BytesIO
         from openpyxl import Workbook
         from openpyxl.styles import PatternFill, Font
         from openpyxl.utils.dataframe import dataframe_to_rows
@@ -1130,7 +1129,6 @@ def server(input, output, session):
 
             ws.column_dimensions[column_letter].width = min(max_length + 2, 30)
 
-        from io import BytesIO
 
         output = BytesIO()
         wb.save(output)
