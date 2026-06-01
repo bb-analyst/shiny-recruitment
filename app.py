@@ -2,6 +2,7 @@ from shiny import App, ui, render, reactive, req
 from shinyswatch import theme
 import pandas as pd
 import plotly.express as px
+import tempfile
 import os
 import json
 from google.oauth2 import service_account
@@ -255,23 +256,6 @@ table_page = ui.nav_panel(
 
             ui.hr(style="margin-top: 8px; margin-bottom: 8px;"),
             ui.h4("Filters"),
-            # ui.input_selectize("competition",
-            #                 "Comp:",
-            #                 choices={str(i):j for i,j in comps_dict.items()},
-            #                 selected='111',
-            #                 multiple=False),
-            # ui.input_checkbox("competition_separate",
-            #                 "Separate Comps", 
-            #                 value=True),
-            # ui.input_selectize("season",
-            #                 "Season:",
-            #                 choices=[str(i) for i in seasons_list],
-            #                 selected='2025',
-            #                 multiple=False),
-            # ui.input_checkbox("season_separate",
-            #                 "Separate Seasons", 
-            #                 value=True),
-            ui.hr(style="margin-top: 0px; margin-bottom: 0px;"),
             ui.input_selectize("summary",
                             "Summary Type:",
                             choices=summary_list,
@@ -378,6 +362,11 @@ table_page = ui.nav_panel(
                 white-space: nowrap !important;
             }
         """),
+        ui.download_button(
+            "download_player_table",
+            "Download Excel",
+            class_="btn btn-sm btn-outline-success"
+        ),
         ui.output_data_frame("player_table")
     )
 )
@@ -1048,6 +1037,106 @@ def server(input, output, session):
             width="100%",
             height="99%"
         )
+
+
+    # -------------------------
+    # Download player table
+    # -------------------------
+
+    @render.download(
+        filename=lambda: "player_table.xlsx"
+    )
+    def download_player_table():
+        from openpyxl import Workbook
+        from openpyxl.styles import PatternFill, Font
+        from openpyxl.utils.dataframe import dataframe_to_rows
+
+        df = summarised_data().reset_index(drop=True)
+        display_df = display_table_data()
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Player Table"
+
+        for row in dataframe_to_rows(display_df, index=False, header=True):
+            ws.append(row)
+
+        # Header styling
+        for cell in ws[1]:
+            cell.font = Font(bold=True)
+
+        # Contract styling for Name column
+        if "Name" in display_df.columns and "all_contract_end" in df.columns:
+            name_col_idx = display_df.columns.get_loc("Name") + 1
+
+            for row_idx, contract_end in enumerate(df["all_contract_end"], start=2):
+
+                cell = ws.cell(row=row_idx, column=name_col_idx)
+
+                if pd.isna(contract_end):
+                    cell.font = Font(color="999999", bold=True)
+
+                elif int(contract_end) == 2026:
+                    cell.font = Font(color="FF4444", bold=True)
+
+                elif int(contract_end) == 2027:
+                    cell.font = Font(color="E6970A", bold=True)
+
+        # Highlight rule styling
+        for rule in current_highlight_rules():
+            col = rule["col"]
+
+            if col not in display_df.columns:
+                continue
+
+            col_idx = display_df.columns.get_loc(col) + 1
+            numeric_col = pd.to_numeric(display_df[col], errors="coerce")
+            threshold = rule["val"]
+
+            if input.summary() in ["Game Totals", "Season Totals"] and "MAT" in display_df.columns:
+                row_threshold = pd.to_numeric(display_df["MAT"], errors="coerce") * threshold
+
+                mask = [
+                    eval_rule(value, rule["op"], thresh)
+                    for value, thresh in zip(numeric_col, row_threshold)
+                ]
+            else:
+                mask = numeric_col.apply(
+                    lambda x: eval_rule(x, rule["op"], threshold)
+                )
+
+            excel_color = rule["color"].replace("#", "").upper()
+            fill = PatternFill(
+                start_color=excel_color,
+                end_color=excel_color,
+                fill_type="solid"
+            )
+
+            for row_idx, should_highlight in enumerate(mask, start=2):
+                if should_highlight:
+                    cell = ws.cell(row=row_idx, column=col_idx)
+                    cell.fill = fill
+                    cell.font = Font(bold=True)
+
+        # Auto-width columns
+        for column_cells in ws.columns:
+            max_length = 0
+            column_letter = column_cells[0].column_letter
+
+            for cell in column_cells:
+                value = cell.value
+                if value is not None:
+                    max_length = max(max_length, len(str(value)))
+
+            ws.column_dimensions[column_letter].width = min(max_length + 2, 30)
+
+        from io import BytesIO
+
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+
+        yield output.getvalue()
 
     # -------------------------
     # Leaderboards
