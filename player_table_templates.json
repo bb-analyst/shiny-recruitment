@@ -1,0 +1,40 @@
+{
+  "Middle Forwards": {
+    "summary": "Game Average",
+    "min_games": 5,
+    "game_types": [
+      "Regular"
+    ],
+    "team": [],
+    "player": [],
+    "position": [
+      "Prop",
+      "Lock",
+      "Interchange"
+    ],
+    "position_separate": false,
+    "season_separate": false,
+    "comp_separate": false,
+    "stats": [
+      "Rating",
+      "allRuns",
+      "allRunMetres",
+      "linebreaks",
+      "tackleBreaks",
+      "tackles",
+      "missedTackles",
+      "ineffectiveTackles",
+      "effectiveTacklePercentage",
+      "errors",
+      "penalties"
+    ],
+    "highlight_rules": [
+      {
+        "col": "Runs",
+        "op": ">",
+        "val": 10.0,
+        "color": "#4ade80"
+      }
+    ]
+  }
+}

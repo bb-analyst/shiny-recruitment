@@ -7,8 +7,10 @@ import json
 from google.oauth2 import service_account
 from google.cloud import bigquery
 from dotenv import load_dotenv
+import uuid
 from pathlib import Path
 from data import queries, processing
+
 
 # #Authenticate
 # key_path = Path(__file__).parent / "recruitment_bq.json"
@@ -37,21 +39,20 @@ credentials = service_account.Credentials.from_service_account_info(service_acco
 client = bigquery.Client(credentials=credentials)
 contracts_df = queries.fetch_bq_contract_data(client)
 
-#Constants
-# comps_dict = {
-#     'nrl': 111,
-#     'nswcup': 113,
-#     'qcup': 114,
-#     'origin': 116,
-#     'superleague': 121,
-#     'haroldmatthews': 143,
-#     'sgball': 144,
-#     'cyrilconnell': 154,
-#     'malmeninga': 155,
-#     'jerseyflegg': 159,
-#     'nrlw': 161
-# }
-#Constants
+TEMPLATE_FILE = Path(__file__).parent / "player_table_templates.json"
+
+
+def load_templates():
+    if TEMPLATE_FILE.exists():
+        with open(TEMPLATE_FILE, "r") as f:
+            return json.load(f)
+    return {}
+
+
+def save_templates(templates):
+    with open(TEMPLATE_FILE, "w") as f:
+        json.dump(templates, f, indent=2)
+
 
 CONTRACT_END_COLORS = {
     2026: "#FF4444",  # red
@@ -96,6 +97,23 @@ default_stats = ['Rating','allRuns','allRunMetres',
                  'tackleBreaks',
                  'tackles','missedTackles','ineffectiveTackles','effectiveTacklePercentage',
                  'errors','penalties']
+
+
+
+def eval_rule(value, op, threshold):
+    if pd.isna(value): return False
+    if op == ">":  return value > threshold
+    if op == "<":  return value < threshold
+    if op == ">=": return value >= threshold
+    if op == "<=": return value <= threshold
+    if op == "=":  return abs(value - threshold) < 0.001
+    return False
+
+def hex_to_rgba(hex_color, alpha):
+    h = hex_color.lstrip("#")
+    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+    return f"rgba({r},{g},{b},{alpha})"
+
 
 leaderboard_defaults = {
     'WG': ['tries','allRuns','tackles'],
@@ -199,6 +217,43 @@ table_page = ui.nav_panel(
     ui.p("Use the filters on the left to customise the player statistics table. You can sort by a column by clicking the header."),
     ui.layout_sidebar(
         ui.sidebar(
+            ui.h4("Templates"),
+
+            ui.input_select(
+                "player_table_template",
+                "Template:",
+                choices=[],
+                selected=None,
+                width="100%"
+            ),
+
+            ui.div(
+                {"style": "display:flex; gap:6px; margin-bottom:8px;"},
+                ui.input_action_button(
+                    "apply_player_table_template",
+                    "Apply",
+                    class_="btn btn-sm btn-outline-primary"
+                ),
+                ui.input_action_button(
+                    "delete_player_table_template",
+                    "Delete",
+                    class_="btn btn-sm btn-outline-danger"
+                ),
+            ),
+
+            ui.input_text(
+                "new_template_name",
+                "Save current view as:",
+                placeholder="e.g. Middle forwards"
+            ),
+
+            ui.input_action_button(
+                "save_player_table_template",
+                "Save template",
+                class_="btn btn-sm btn-outline-success"
+            ),
+
+            ui.hr(style="margin-top: 8px; margin-bottom: 8px;"),
             ui.h4("Filters"),
             # ui.input_selectize("competition",
             #                 "Comp:",
@@ -259,7 +314,12 @@ table_page = ui.nav_panel(
                             "Stats:",
                             choices={category:stats_dict[category] for category in ['Derived','Attack','Defence','Discipline','Kicking']},
                             selected=default_stats,
-                            multiple=True)
+                            multiple=True),
+            ui.hr(style="margin-top: 0px; margin-bottom: 0px;"),
+            ui.h6("Highlight Rules"),
+            ui.output_ui("highlight_rules_ui"),
+            ui.input_action_button("add_rule", "Add rule", class_="btn btn-sm btn-outline-secondary mt-1"),
+            width=450
         ),
         # Custom CSS
         ui.tags.style("""
@@ -409,14 +469,23 @@ app_ui = ui.page_navbar(
 #Server
 def server(input, output, session):
 
-    #Fetch Fixture Data from BigQuery
+    player_table_templates = reactive.value(load_templates())
+
+    @reactive.effect
+    def update_template_choices():
+        templates = player_table_templates()
+
+        ui.update_select(
+            "player_table_template",
+            choices=list(templates.keys()),
+            selected=input.player_table_template()
+        )
+
     @reactive.calc
     def fixture_data():
         reactive.invalidate_later(7200) 
         df = queries.fetch_bq_latest_fixtures(client)
         return df.sort_values(by=['competitionName','roundId','gameNumber'])
-
-
 
     @render.ui
     def fixture_cards():
@@ -427,38 +496,33 @@ def server(input, output, session):
         grouped = df.groupby(['competitionId','competitionName','roundName'])
 
         cards = []
-        for (comp_id,comp_name,round_name), group_df in grouped:
-            #Create table
+        for (comp_id, comp_name, round_name), group_df in grouped:
             table_df = group_df[['gameNumber','game','gameStateName']].copy()
-            
-            # Replace gameStateId with icons
-            table_df['gameStateName'] = table_df['gameStateName'].apply(lambda x: '✅' if x == 'Final' else '❌')
-            
-            # Convert to HTML table with Bootstrap styling
+            table_df['gameStateName'] = table_df['gameStateName'].apply(
+                lambda x: '✅' if x == 'Final' else '❌'
+            )
             table_html = table_df.to_html(
                 index=False,
                 header=False, 
                 classes="table table-hover table-sm fixture-columns",
                 border=0
             )
-            
-            card = ui.card(
-                ui.card_header(f"{comp_name} - {round_name}"),
-                ui.HTML(table_html)
+            cards.append(
+                ui.card(
+                    ui.card_header(f"{comp_name} - {round_name}"),
+                    ui.HTML(table_html)
+                )
             )
-            cards.append(card)
         
         return ui.div(*cards)
 
-
-    
-    #Fetch data from BigQuery when comp or season changes and calculate rating
     @reactive.calc
     def bigquery_data():
         reactive.invalidate_later(86400)
         comps = [int(c) for c in input.competition()]
         seasons = [int(s) for s in input.season()]
-        req(comps, seasons)  # silently stops execution if either is empty
+        req(comps, seasons)
+
         stats = [k for c in stats_dict.keys() if c != "Derived" for k in stats_dict[c]]
         df = queries.fetch_bq_player_data(client, comps, seasons, stats)
         df = processing.calculate_rating(df)
@@ -470,9 +534,9 @@ def server(input, output, session):
         comps = [int(c) for c in input.competition()]
         seasons = [int(s) for s in input.season()]
         req(comps, seasons)
+
         return queries.fetch_bq_rankings_data(client, comps, seasons)
 
-    #Update team choices when BigQuery data changes
     @reactive.effect
     def update_team_choices():
         df = bigquery_data()
@@ -481,17 +545,17 @@ def server(input, output, session):
             .drop_duplicates()
             .sort_values("teamNickName")
             .set_index("teamId")["teamNickName"]
-            .astype(str)  # ensure values are strings (optional)
+            .astype(str)
             .to_dict()
         )
         teams = {str(k): v for k, v in teams.items()}
         ui.update_select("team", choices=teams)
 
-    #Update player choices when BigQuery data changes and team selection changes
     @reactive.effect
     def update_player_choices():
         df = bigquery_data()
         selected_teams = input.team()
+
         if selected_teams:
             df = df[df["teamId"].astype(str).isin(selected_teams)]
 
@@ -500,50 +564,48 @@ def server(input, output, session):
             .drop_duplicates()
             .sort_values("playerName") 
             .set_index("playerId")["playerName"]
-            .astype(str)  # ensure values are strings (optional)
+            .astype(str)
             .to_dict()
         )
         players = {str(k): v for k, v in players.items()}
         ui.update_select("player", choices=players)
 
-    #Filter bigquery data based on inputs
     @reactive.calc
     def filtered_data():
         df = bigquery_data()
 
-        #Get filter inputs
         game_types = input.game_types()
+
         teams = input.team()
         teams = [int(t) for t in teams] if teams else None
+
         players = input.player()
         players = [int(p) for p in players] if players else None
+
         positions = input.position()
+
         stats = list(input.stats())
         stats = list(stats_dict['Always'].keys()) + stats
 
-        #Filter
         filtered_df = processing.filter_bq_player_data(
-            df,
-            game_types,
-            teams,
-            players,
-            positions,
-            stats
+            df, game_types, teams, players, positions, stats
         )
 
         return filtered_df
     
-    #Summarise filtered data
     @reactive.calc
     def summarised_data():
         df = filtered_data()
+
         summary_type = input.summary()
         min_games = input.min_games()
         separate_positions = input.position_separate()
         separate_seasons = input.season_separate()
         separate_comps = input.comp_separate()
+
         stats = list(input.stats())
         stats = ['mins'] + stats
+
         summarised_df = processing.summarise_filtered_data(
             df,
             summary_type,
@@ -554,56 +616,454 @@ def server(input, output, session):
             stats,
             stats_flattened_dict
         )
+
         summarised_df = processing.add_contract_info(summarised_df, contracts_df)
+
         return summarised_df
-    
+
+    @reactive.calc
+    def display_table_data():
+        df = summarised_data().reset_index(drop=True)
+        display_df = df.drop(columns=["PID", "all_contract_end"], errors="ignore")
+        return display_df
+
+    # -------------------------
+    # Highlight rules
+    # -------------------------
+
+    import uuid
+
+    highlight_rules = reactive.value([])
+
+
+    @reactive.effect
+    @reactive.event(input.add_rule)
+    def add_highlight_rule():
+        display_df = display_table_data()
+        numeric_cols = display_df.select_dtypes(include="number").columns.tolist()
+
+        if not numeric_cols:
+            return
+
+        rules = list(highlight_rules())
+
+        rules.append({
+            "id": str(uuid.uuid4())[:8],
+            "col": numeric_cols[0],
+            "op": ">",
+            "val": 0.0,
+            "color": "#4ade80"
+        })
+
+        highlight_rules.set(rules)
+
+
+    @render.ui
+    def highlight_rules_ui():
+        rules = highlight_rules()
+
+        display_df = display_table_data()
+        numeric_cols = display_df.select_dtypes(include="number").columns.tolist()
+
+        if not numeric_cols:
+            return ui.p("No numeric columns available to highlight.")
+
+        rows = []
+
+        for rule in rules:
+            rid = rule["id"]
+
+            rows.append(
+                ui.div(
+                    {
+                        "style": (
+                            "display:flex; gap:4px; align-items:center; "
+                            "margin-bottom:4px;"
+                        )
+                    },
+
+                    ui.input_select(
+                        f"rule_col_{rid}",
+                        None,
+                        choices=numeric_cols,
+                        selected=rule["col"] if rule["col"] in numeric_cols else numeric_cols[0],
+                        width="140px"
+                    ),
+
+                    ui.input_select(
+                        f"rule_op_{rid}",
+                        None,
+                        choices={
+                            ">": ">",
+                            "<": "<",
+                            ">=": "≥",
+                            "<=": "≤",
+                            "=": "="
+                        },
+                        selected=rule["op"],
+                        width="55px"
+                    ),
+
+                    ui.input_numeric(
+                        f"rule_val_{rid}",
+                        None,
+                        value=rule["val"],
+                        width="70px"
+                    ),
+
+                    ui.input_select(
+                        f"rule_color_{rid}",
+                        None,
+                        choices={
+                            "#4ade80": "Green",
+                            "#facc15": "Amber",
+                            "#f87171": "Red"
+                        },
+                        selected=rule["color"],
+                        width="80px"
+                    ),
+
+                    ui.input_action_button(
+                        f"rule_delete_{rid}",
+                        "✕",
+                        class_="btn btn-sm btn-outline-danger",
+                        style="padding:2px 7px;"
+                    ),
+                )
+            )
+
+        return ui.div(*rows)
+
+
+    @reactive.effect
+    def sync_and_delete_highlight_rules():
+
+        rules = list(highlight_rules())
+        new_rules = []
+        changed = False
+
+        for rule in rules:
+
+            rid = rule["id"]
+
+            # -------------------------
+            # Delete
+            # -------------------------
+
+            try:
+                delete_count = input[f"rule_delete_{rid}"]()
+            except Exception:
+                delete_count = 0
+
+            if delete_count > 0:
+                changed = True
+                continue
+
+            # -------------------------
+            # Sync values
+            # -------------------------
+
+            try:
+                col = input[f"rule_col_{rid}"]()
+                op = input[f"rule_op_{rid}"]()
+                val = input[f"rule_val_{rid}"]()
+                color = input[f"rule_color_{rid}"]()
+
+            except Exception:
+                new_rules.append(rule)
+                continue
+
+            if col is None or op is None or val is None or color is None:
+                new_rules.append(rule)
+                continue
+
+            updated_rule = {
+                "id": rid,
+                "col": col,
+                "op": op,
+                "val": float(val),
+                "color": color
+            }
+
+            if updated_rule != rule:
+                changed = True
+
+            new_rules.append(updated_rule)
+
+        if changed:
+            highlight_rules.set(new_rules)
+
+
+    @reactive.calc
+    def current_highlight_rules():
+        return highlight_rules()
+
+
+    # -------------------------
+    # Player table templates
+    # -------------------------
+
+    @reactive.effect
+    @reactive.event(input.save_player_table_template)
+    def save_current_template():
+        template_name = input.new_template_name()
+
+        if not template_name:
+            return
+
+        templates = dict(player_table_templates())
+
+        templates[template_name] = {
+            "summary": input.summary(),
+            "min_games": input.min_games(),
+            "game_types": list(input.game_types()),
+            "team": list(input.team()),
+            "player": list(input.player()),
+            "position": list(input.position()),
+            "position_separate": input.position_separate(),
+            "season_separate": input.season_separate(),
+            "comp_separate": input.comp_separate(),
+            "stats": list(input.stats()),
+            "highlight_rules": [
+                {
+                    "col": rule["col"],
+                    "op": rule["op"],
+                    "val": rule["val"],
+                    "color": rule["color"],
+                }
+                for rule in current_highlight_rules()
+            ],
+        }
+
+        save_templates(templates)
+        player_table_templates.set(templates)
+
+        ui.update_select(
+            "player_table_template",
+            choices=list(templates.keys()),
+            selected=template_name
+        )
+
+        ui.update_text("new_template_name", value="")
+
+
+    @reactive.effect
+    @reactive.event(input.apply_player_table_template)
+    def apply_player_table_template():
+        template_name = input.player_table_template()
+
+        if not template_name:
+            return
+
+        templates = player_table_templates()
+
+        if template_name not in templates:
+            return
+
+        template = templates[template_name]
+
+
+        ui.update_selectize(
+            "summary",
+            selected=template.get("summary", "Game Average")
+        )
+
+        ui.update_slider(
+            "min_games",
+            value=template.get("min_games", 1)
+        )
+
+        ui.update_checkbox_group(
+            "game_types",
+            selected=template.get("game_types", ["Regular"])
+        )
+
+        ui.update_selectize(
+            "team",
+            selected=template.get("team", [])
+        )
+
+        ui.update_selectize(
+            "player",
+            selected=template.get("player", [])
+        )
+
+        ui.update_selectize(
+            "position",
+            selected=template.get("position", [])
+        )
+
+        ui.update_checkbox(
+            "position_separate",
+            value=template.get("position_separate", False)
+        )
+
+        ui.update_checkbox(
+            "season_separate",
+            value=template.get("season_separate", False)
+        )
+
+        ui.update_checkbox(
+            "comp_separate",
+            value=template.get("comp_separate", False)
+        )
+
+        ui.update_selectize(
+            "stats",
+            selected=template.get("stats", default_stats)
+        )
+
+        rules = []
+
+        for rule in template.get("highlight_rules", []):
+            rules.append({
+                "id": str(uuid.uuid4())[:8],
+                "col": rule["col"],
+                "op": rule["op"],
+                "val": rule["val"],
+                "color": rule["color"],
+            })
+
+        highlight_rules.set(rules)
+
+
+    @reactive.effect
+    @reactive.event(input.delete_player_table_template)
+    def delete_player_table_template():
+        template_name = input.player_table_template()
+
+        if not template_name:
+            return
+
+        templates = dict(player_table_templates())
+
+        if template_name in templates:
+            del templates[template_name]
+
+        save_templates(templates)
+        player_table_templates.set(templates)
+
+        ui.update_select(
+            "player_table_template",
+            choices=list(templates.keys()),
+            selected=None
+        )
+
+
+    # -------------------------
+    # Player table
+    # -------------------------
+
     @output
     @render.data_frame
     def player_table():
-        df = summarised_data()
+        df = summarised_data().reset_index(drop=True)
+        display_df = display_table_data()
 
         styles = []
+
         for year, color in CONTRACT_END_COLORS.items():
-            matching_rows = df.index[df["all_contract_end"] == year].tolist()
-            if matching_rows:
-                styles.append(
-                    render.StyleInfo(
+            if "all_contract_end" in df.columns and "Name" in display_df.columns:
+                matching_rows = df.index[df["all_contract_end"] == year].tolist()
+
+                if matching_rows:
+                    styles.append(render.StyleInfo(
                         rows=matching_rows,
                         cols=["Name"],
-                        style={"color": color, "font-weight": "bold"},
+                        style={
+                            "color": color,
+                            "font-weight": "bold"
+                        },
+                    ))
+
+        if "all_contract_end" in df.columns and "Name" in display_df.columns:
+            unsigned_rows = df.index[df["all_contract_end"].isna()].tolist()
+
+            if unsigned_rows:
+                styles.append(render.StyleInfo(
+                    rows=unsigned_rows,
+                    cols=["Name"],
+                    style={
+                        "color": "#999999",
+                        "font-weight": "bold"
+                    },
+                ))
+
+        for rule in current_highlight_rules():
+
+            col = rule["col"]
+
+            if col not in display_df.columns:
+                continue
+
+            numeric_col = pd.to_numeric(display_df[col], errors="coerce")
+
+            threshold = rule["val"]
+
+            # -------------------------
+            # Scale totals by matches
+            # -------------------------
+
+            if input.summary() in ["Game Totals"]:
+
+                if "MAT" in display_df.columns:
+
+                    row_threshold = (
+                        pd.to_numeric(display_df["MAT"], errors="coerce")
+                        * threshold
+                    )
+
+                else:
+                    row_threshold = threshold
+
+                mask = [
+                    eval_rule(value, rule["op"], thresh)
+                    for value, thresh in zip(numeric_col, row_threshold)
+                ]
+
+            else:
+
+                mask = numeric_col.apply(
+                    lambda x: eval_rule(x, rule["op"], threshold)
+                )
+
+            rows = display_df.index[mask].tolist()
+
+            if rows:
+
+                styles.append(
+                    render.StyleInfo(
+                        rows=rows,
+                        cols=[col],
+                        style={
+                            "background-color": hex_to_rgba(rule["color"], 0.45),
+                            "font-weight": "bold",
+                        }
                     )
                 )
 
-        unsigned_rows = df.index[df["all_contract_end"].isna()].tolist()
-        if unsigned_rows:
-            styles.append(
-                render.StyleInfo(
-                    rows=unsigned_rows,
-                    cols=["Name"],
-                    style={"color":"#999999","font-weight": "bold"},
-                )
-            )
-        display_df = df.drop(columns=["PID","all_contract_end"], errors="ignore")
+        return render.DataTable(
+            display_df,
+            styles=styles,
+            width="100%",
+            height="99%"
+        )
 
-        return render.DataTable(display_df, styles=styles,width="100%",height="99%")
+    # -------------------------
+    # Leaderboards
+    # -------------------------
 
-    # Helper function to create leaderboard cards
     def create_leaderboard_cards(position_abbrev):
         stats = input[f"stats_{position_abbrev}"]()
-        
-        
+
         if not stats:
             return ui.p("No stats selected.")
         
-        # Get summary type
         summary_type = input.leaderboard_summary()
-        
         cards = []
+
         for stat in stats:
-            
             output_id = f"grid_{position_abbrev}_{stat}"
-            
-            # Get the display name from stats_flattened_dict
             stat_display_name = stats_flattened_dict.get(stat, stat)
 
             card = ui.div(
@@ -616,17 +1076,13 @@ def server(input, output, session):
             )
             cards.append(card)
 
-            # Create renderer with @output decorator
             def make_renderer(pos_abbrev, stat_name, out_id):
                 @output(id=out_id)
                 @render.data_frame
                 def _():
                     df = bigquery_data()
-                    
-                    # Use a local variable for the query
-                    position = pos_abbrev
-                    df = df[df['playerPositionAbbrev'] == position]
-                    
+                    df = df[df['playerPositionAbbrev'] == pos_abbrev]
+
                     summary_type = input.leaderboard_summary()
                     min_games = input.leaderboard_min_games()
                     top_n = input.leaderboard_top_n()
@@ -638,7 +1094,7 @@ def server(input, output, session):
                         min_games,
                         top_n
                     )
-                    
+
                     return render.DataGrid(
                         leaderboard,
                         width="100%",
@@ -646,14 +1102,13 @@ def server(input, output, session):
                         filters=False,
                         summary=False
                     )
+
                 return _
-            
-            # Call the renderer to register it
+
             make_renderer(position_abbrev, stat, output_id)
         
         return ui.div({"class": "row"}, *cards)
 
-    # Now manually create each output
     @output
     @render.ui
     def cards_WG():
@@ -704,28 +1159,40 @@ def server(input, output, session):
     def cards_INT():
         return create_leaderboard_cards('INT')
 
+    # -------------------------
+    # Rankings
+    # -------------------------
 
-    # Helper to create pivoted rankings table for a position group
-    def create_ranking_table(group):
-        df = rankings_data()
-        if df is None or len(df) == 0:
-            return render.DataGrid(pd.DataFrame())
-
-        group_key = group.replace(' ', '_')
-        selected_metrics = list(input[f"ranking_metrics_{group_key}"]())
-        ranking_method = input.ranking_method()  # single shared input
-
-        final_df = processing.pivot_rankings_data(df, group, selected_metrics, ranking_method)
-
-        return render.DataGrid(final_df, width="100%", filters=False, summary=False)
-    # Register a render function for each position group
     for _group in ranking_position_groups:
         def make_ranking_renderer(g):
             @output(id=f"ranking_table_{g.replace(' ', '_')}")
             @render.data_frame
             def _():
-                return create_ranking_table(g)
+                df = rankings_data()
+
+                if df is None or len(df) == 0:
+                    return render.DataGrid(pd.DataFrame())
+
+                group_key = g.replace(' ', '_')
+                selected_metrics = list(input[f"ranking_metrics_{group_key}"]())
+                ranking_method = input.ranking_method()
+
+                final_df = processing.pivot_rankings_data(
+                    df,
+                    g,
+                    selected_metrics,
+                    ranking_method
+                )
+
+                return render.DataGrid(
+                    final_df,
+                    width="100%",
+                    filters=False,
+                    summary=False
+                )
+
             return _
+
         make_ranking_renderer(_group)
 
 

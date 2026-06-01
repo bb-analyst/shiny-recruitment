@@ -197,3 +197,40 @@ def pivot_rankings_data(df, group, selected_metrics, ranking_method):
             final_df[col] = final_df[col].round(2)
 
     return final_df.reset_index(drop=True)
+
+#**********************************************************************************
+
+def eval_rule(value, op, threshold):
+    if pd.isna(value): return False
+    if op == ">":  return value > threshold
+    if op == "<":  return value < threshold
+    if op == ">=": return value >= threshold
+    if op == "<=": return value <= threshold
+    if op == "=":  return abs(value - threshold) < 0.001
+    return False
+
+def hex_to_rgba(hex_color, alpha):
+    h = hex_color.lstrip("#")
+    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+    return f"rgba({r},{g},{b},{alpha})"
+
+def apply_highlight_rules(df, rules):
+    """
+    Returns a list of StyleInfo dicts (rows, cols, style) for each rule.
+    Caller converts these to render.StyleInfo objects.
+    """
+    style_specs = []
+    for rule in rules:
+        col = rule["col"]
+        if col not in df.columns:
+            continue
+        matched_rows = df.index[
+            df[col].apply(lambda v: eval_rule(v, rule["op"], rule["val"]))
+        ].tolist()
+        if matched_rows:
+            style_specs.append({
+                "rows": matched_rows,
+                "cols": [col],
+                "style": {"background-color": hex_to_rgba(rule["color"], 0.5), "font-weight": "500"},
+            })
+    return style_specs
