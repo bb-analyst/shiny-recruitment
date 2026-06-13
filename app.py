@@ -40,20 +40,8 @@ credentials = service_account.Credentials.from_service_account_info(service_acco
 client = bigquery.Client(credentials=credentials)
 contracts_df = queries.fetch_bq_contract_data(client)
 
-TEMPLATE_FILE = Path(__file__).parent / "player_table_templates.json"
 
-
-def load_templates():
-    if TEMPLATE_FILE.exists():
-        with open(TEMPLATE_FILE, "r") as f:
-            return json.load(f)
-    return {}
-
-
-def save_templates(templates):
-    with open(TEMPLATE_FILE, "w") as f:
-        json.dump(templates, f, indent=2)
-
+HIGHLIGHT_COLORS = {"#4ade80": "Green", "#facc15": "Amber", "#f87171": "Red"}
 
 CONTRACT_END_COLORS = {
     2026: "#FF4444",  # red
@@ -303,6 +291,7 @@ table_page = ui.nav_panel(
             ui.h6("Highlight Rules"),
             ui.output_ui("highlight_rules_ui"),
             ui.input_action_button("add_rule", "Add rule", class_="btn btn-sm btn-outline-secondary mt-1"),
+
             width=450
         ),
         # Custom CSS
@@ -458,7 +447,7 @@ app_ui = ui.page_navbar(
 #Server
 def server(input, output, session):
 
-    player_table_templates = reactive.value(load_templates())
+    player_table_templates = reactive.value(queries.fetch_player_table_templates(credentials))
 
     @reactive.effect
     def update_template_choices():
@@ -824,7 +813,7 @@ def server(input, output, session):
             ],
         }
 
-        save_templates(templates)
+        queries.save_player_table_templates(credentials, templates)
         player_table_templates.set(templates)
 
         ui.update_select(
@@ -836,22 +825,8 @@ def server(input, output, session):
         ui.update_text("new_template_name", value="")
 
 
-    @reactive.effect
-    @reactive.event(input.apply_player_table_template)
-    def apply_player_table_template():
-        template_name = input.player_table_template()
-
-        if not template_name:
-            return
-
-        templates = player_table_templates()
-
-        if template_name not in templates:
-            return
-
-        template = templates[template_name]
-
-
+    # Helper that applies a template dict to all inputs
+    def apply_template_to_inputs(template):
         ui.update_selectize(
             "summary",
             selected=template.get("summary", "Game Average")
@@ -917,6 +892,34 @@ def server(input, output, session):
 
 
     @reactive.effect
+    @reactive.event(input.apply_player_table_template)
+    def apply_player_table_template():
+        template_name = input.player_table_template()
+
+        if not template_name:
+            return
+
+        templates = player_table_templates()
+
+        if template_name not in templates:
+            return
+
+        apply_template_to_inputs(templates[template_name])
+
+    # Apply "Default" template once on session start
+    default_applied = reactive.value(False)
+
+    @reactive.effect
+    def apply_default_on_launch():
+        if default_applied():
+            return
+        templates = player_table_templates()
+        if "Default" in templates:
+            apply_template_to_inputs(templates["Default"])
+            ui.update_select("player_table_template", selected="Default")
+        default_applied.set(True)
+
+    @reactive.effect
     @reactive.event(input.delete_player_table_template)
     def delete_player_table_template():
         template_name = input.player_table_template()
@@ -929,7 +932,7 @@ def server(input, output, session):
         if template_name in templates:
             del templates[template_name]
 
-        save_templates(templates)
+        queries.save_player_table_templates(credentials, templates)
         player_table_templates.set(templates)
 
         ui.update_select(

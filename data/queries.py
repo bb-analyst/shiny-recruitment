@@ -2,6 +2,8 @@ from google.cloud import bigquery
 from google.oauth2 import service_account
 import pandas as pd
 from pathlib import Path
+import json
+from google.cloud import storage
 
 def get_client():
     key_path = Path(__file__).parent / "recruitment_bq.json"
@@ -103,3 +105,22 @@ def fetch_bq_rankings_data(client, comps, seasons):
         ]
     )
     return client.query(query, job_config=job_config).to_dataframe()
+
+
+
+def fetch_player_table_templates(credentials):
+    client = storage.Client(credentials=credentials)
+    bucket = client.bucket("rugbaleeg-bucket")
+    blob = bucket.blob("shiny-recruitment/player_table_templates.json")
+    if not blob.exists():
+        return {}
+    return json.loads(blob.download_as_text())
+
+def save_player_table_templates(credentials, templates: dict):
+    client = storage.Client(credentials=credentials)
+    bucket = client.bucket("rugbaleeg-bucket")
+    blob = bucket.blob("shiny-recruitment/player_table_templates.json")
+    blob.upload_from_string(
+        json.dumps(templates, indent=2),
+        content_type="application/json"
+    )
