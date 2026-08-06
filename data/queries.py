@@ -87,6 +87,39 @@ def fetch_bq_latest_fixtures(
     return job.to_dataframe()
 
 
+GAME_SUMMARY_STATS = [
+    'playerName', 'shirtNum', 'playerPositionAbbrev', 'teamName',
+    'mins', 'allRuns', 'allRunMetres', 'postContactMetres',
+    'tries', 'tryAssists', 'linebreaks', 'tackleBreaks', 'offloads',
+    'tackles', 'missedTackles', 'errors'
+]
+
+
+def fetch_bq_game_summary(
+    client: bigquery.Client,
+    game_id
+) -> pd.DataFrame:
+
+    query = f"""
+        SELECT {', '.join(GAME_SUMMARY_STATS)}
+        FROM `rugbaleeg.statsperform.player-match-stats`
+        WHERE gameId = @game_id
+        ORDER BY teamName, shirtNum
+    """
+
+    param_type = "STRING" if isinstance(game_id, str) else "INT64"
+    job_config = bigquery.QueryJobConfig(
+        query_parameters=[
+            bigquery.ScalarQueryParameter("game_id", param_type, game_id)
+        ]
+    )
+
+    job = client.query(query, job_config=job_config)
+    job.result()
+
+    return job.to_dataframe()
+
+
 def fetch_bq_rankings_data(client, comps, seasons):
     query = """
         SELECT 
