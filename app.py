@@ -5,6 +5,7 @@ import plotly.express as px
 import tempfile
 import os
 import json
+import html
 from google.oauth2 import service_account
 from google.cloud import bigquery
 from dotenv import load_dotenv
@@ -441,7 +442,10 @@ app_ui = ui.page_navbar(
     fillable=True,
     theme=theme.flatly(),
     id="navbar",
-    header=ui.tags.link(href="css.css", rel="stylesheet")
+    header=ui.TagList(
+        ui.tags.link(href="css.css", rel="stylesheet"),
+        ui.tags.script(src="fixture-click.js"),
+    )
 )
 
 #Server
@@ -475,15 +479,20 @@ def server(input, output, session):
 
         cards = []
         for (comp_id, comp_name, round_name), group_df in grouped:
-            table_df = group_df[['gameNumber','game','gameStateName']].copy()
-            table_df['gameStateName'] = table_df['gameStateName'].apply(
-                lambda x: '✅' if x == 'Final' else '❌'
-            )
-            table_html = table_df.to_html(
-                index=False,
-                header=False, 
-                classes="table table-hover table-sm fixture-columns",
-                border=0
+            rows = []
+            for game in group_df.itertuples(index=False):
+                state = '✅' if game.gameStateName == 'Final' else '❌'
+                rows.append(
+                    f'<tr data-game-id="{html.escape(str(game.gameId))}">'
+                    f'<td>{html.escape(str(game.gameNumber))}</td>'
+                    f'<td>{html.escape(str(game.game))}</td>'
+                    f'<td>{state}</td>'
+                    f'</tr>'
+                )
+            table_html = (
+                '<table class="table table-hover table-sm fixture-columns">'
+                f'<tbody>{"".join(rows)}</tbody>'
+                '</table>'
             )
             cards.append(
                 ui.card(
@@ -491,8 +500,89 @@ def server(input, output, session):
                     ui.HTML(table_html)
                 )
             )
-        
+
         return ui.div(*cards)
+
+    game_summary_cache = {}
+
+    @reactive.effect
+    @reactive.event(input.fixture_clicked)
+    def show_fixture_modal():
+        clicked_id = input.fixture_clicked()
+        fixtures = fixture_data()
+
+        # Resolve the click against known fixtures so we only ever query a
+        # gameId the app actually rendered.
+        match = fixtures[fixtures['gameId'].astype(str) == str(clicked_id)]
+        if match.empty:
+            return
+        fixture_row = match.iloc[0]
+
+        # Match the parameter type to the column dtype rather than guessing
+        # from the string the browser sent back.
+        if pd.api.types.is_numeric_dtype(fixtures['gameId']):
+            game_id = int(fixture_row['gameId'])
+        else:
+            game_id = str(fixture_row['gameId'])
+
+        title = (
+            f"{fixture_row['game']} — "
+            f"{fixture_row['competitionName']} {fixture_row['roundName']}"
+        )
+
+        cache_key = str(game_id)
+        if cache_key not in game_summary_cache:
+            try:
+                game_summary_cache[cache_key] = queries.fetch_bq_game_summary(client, game_id)
+            except Exception as e:
+                ui.modal_show(
+                    ui.modal(
+                        ui.p("Could not load the match summary."),
+                        ui.pre(str(e)),
+                        title=title,
+                        easy_close=True,
+                        footer=ui.modal_button("Close")
+                    )
+                )
+                return
+
+        df = game_summary_cache[cache_key]
+
+        if df is None or len(df) == 0:
+            ui.modal_show(
+                ui.modal(
+                    ui.p("No player stats available for this match yet."),
+                    title=title,
+                    easy_close=True,
+                    footer=ui.modal_button("Close")
+                )
+            )
+            return
+
+        body = []
+        for team_name, team_df in df.groupby('teamName', sort=False):
+            team_df = team_df.drop(columns=['teamName']).rename(columns=stats_flattened_dict)
+            body.append(ui.h5(team_name, style="margin-top: 12px;"))
+            body.append(
+                ui.HTML(
+                    team_df.to_html(
+                        index=False,
+                        classes="table table-sm table-striped game-summary-table",
+                        border=0,
+                        na_rep=""
+                    )
+                )
+            )
+
+        ui.modal_show(
+            ui.modal(
+                *body,
+                title=title,
+                easy_close=True,
+                size="xl",
+                footer=ui.modal_button("Close")
+            )
+        )
 
     @reactive.calc
     def bigquery_data():
