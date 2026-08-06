@@ -34,6 +34,27 @@
     width: 100%;
 }
 
+.fixture-columns tbody tr {
+    cursor: pointer;
+}
+
+.game-summary-table {
+    width: 100%;
+    font-size: 0.85rem;
+}
+
+.game-summary-table td,
+.game-summary-table th {
+    text-align: center;
+    white-space: nowrap;
+    padding: 2px 6px;
+}
+
+.game-summary-table td:first-child,
+.game-summary-table th:first-child {
+    text-align: left;
+}
+
 /* Hide ALL table headers in leaderboard cards - try multiple selectors */
 .leaderboard-grid-card thead,
 .leaderboard-grid-card .shiny-data-grid thead,
