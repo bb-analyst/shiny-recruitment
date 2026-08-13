@@ -175,7 +175,7 @@ def player_table_ui(contract_end_choices):
         ui.layout_sidebar(
             ui.sidebar(
                 ui.h4("Templates"),
-                ui.input_select("template", "Template:", choices=[], selected=None, width="100%"),
+                ui.input_selectize("template", "Template:", choices=[], selected=None, width="100%"),
                 ui.div(
                     {"style": "display:flex; gap:6px; margin-bottom:8px;"},
                     ui.input_action_button(
@@ -262,7 +262,7 @@ def player_table_server(input, output, session, bigquery_data, contracts_df, cre
             .astype(str)
             .to_dict()
         )
-        ui.update_select("team", choices={str(k): v for k, v in teams.items()})
+        ui.update_selectize("team", choices={str(k): v for k, v in teams.items()})
 
     @reactive.effect
     def update_player_choices():
@@ -280,7 +280,7 @@ def player_table_server(input, output, session, bigquery_data, contracts_df, cre
             .astype(str)
             .to_dict()
         )
-        ui.update_select("player", choices={str(k): v for k, v in players.items()})
+        ui.update_selectize("player", choices={str(k): v for k, v in players.items()})
 
     @reactive.calc
     def filtered_data():
@@ -437,7 +437,7 @@ def player_table_server(input, output, session, bigquery_data, contracts_df, cre
 
     @reactive.effect
     def update_template_choices():
-        ui.update_select(
+        ui.update_selectize(
             "template",
             choices=list(templates().keys()),
             selected=input.template(),
@@ -472,7 +472,7 @@ def player_table_server(input, output, session, bigquery_data, contracts_df, cre
         queries.save_player_table_templates(credentials, saved)
         templates.set(saved)
 
-        ui.update_select("template", choices=list(saved.keys()), selected=template_name)
+        ui.update_selectize("template", choices=list(saved.keys()), selected=template_name)
         ui.update_text("new_template_name", value="")
 
     def apply_template_to_inputs(template):
@@ -514,7 +514,7 @@ def player_table_server(input, output, session, bigquery_data, contracts_df, cre
         saved = templates()
         if "Default" in saved:
             apply_template_to_inputs(saved["Default"])
-            ui.update_select("template", selected="Default")
+            ui.update_selectize("template", selected="Default")
 
         default_applied.set(True)
 
@@ -531,7 +531,7 @@ def player_table_server(input, output, session, bigquery_data, contracts_df, cre
         queries.save_player_table_templates(credentials, saved)
         templates.set(saved)
 
-        ui.update_select("template", choices=list(saved.keys()), selected=None)
+        ui.update_selectize("template", choices=list(saved.keys()), selected=None)
 
     # -------------------------
     # Table and export
