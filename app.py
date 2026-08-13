@@ -22,10 +22,16 @@ client = bq_client.get_bq_client(credentials)
 # Contracts change rarely and are small; fetch once at startup.
 contracts_df = queries.fetch_bq_contract_data(client)
 
+# Players with no contract row first, then the expiry years actually present
+# in the data.
+CONTRACT_END_CHOICES = [config.UNSIGNED_LABEL] + [
+    str(int(year)) for year in sorted(contracts_df["all_contract_end"].dropna().unique())
+]
+
 
 app_ui = ui.page_navbar(
     home_ui("home"),
-    player_table_ui("player_table"),
+    player_table_ui("player_table", CONTRACT_END_CHOICES),
     leaderboards_ui("leaderboards"),
     rankings_ui("rankings"),
     ui.nav_spacer(),

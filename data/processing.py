@@ -17,6 +17,24 @@ def add_contract_info(df: pd.DataFrame, contracts_df: pd.DataFrame) -> pd.DataFr
         how="left"
     ).drop(columns=["player_id"])
 
+def filter_by_contract_end(df, selected, unsigned_label):
+    """Keep players whose contract ends in one of the selected years.
+
+    ``selected`` holds year strings and may include ``unsigned_label`` for
+    players with no contract row, whose all_contract_end is NaN after the
+    merge. An empty selection means no filtering.
+    """
+    if not selected or "all_contract_end" not in df.columns:
+        return df
+
+    years = [int(s) for s in selected if s != unsigned_label]
+
+    mask = df["all_contract_end"].isin(years)
+    if unsigned_label in selected:
+        mask = mask | df["all_contract_end"].isna()
+
+    return df[mask.fillna(False).astype(bool)]
+
 def filter_bq_player_data(df,game_types,teams=None,players=None,positions=None,stats=None):
     
     #filter dataframe

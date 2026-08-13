@@ -31,6 +31,10 @@ CONTRACT_END_COLORS = {
 }
 UNSIGNED_COLOR = "#999999"
 
+# Filter option for players with no contract row, whose contract end is NaN
+# after the merge onto player stats.
+UNSIGNED_LABEL = "Unsigned"
+
 # -------------------------
 # Competitions and seasons
 # -------------------------

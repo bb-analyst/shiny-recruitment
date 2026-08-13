@@ -164,7 +164,7 @@ def build_workbook(df: pd.DataFrame, display_df: pd.DataFrame, rules, scale_by_m
 
 
 @module.ui
-def player_table_ui():
+def player_table_ui(contract_end_choices):
     return ui.nav_panel(
         "Player Table",
         ui.h2("Player Statistics Table"),
@@ -211,6 +211,10 @@ def player_table_ui():
                 ui.input_selectize(
                     "position", "Positions:",
                     choices=config.POSITIONS, selected=[], multiple=True,
+                ),
+                ui.input_selectize(
+                    "contract_end", "Contract Ends:",
+                    choices=contract_end_choices, selected=[], multiple=True,
                 ),
                 ui.input_checkbox("position_separate", "Separate Positions", value=False),
                 ui.input_checkbox("season_separate", "Separate Seasons", value=False),
@@ -306,7 +310,12 @@ def player_table_server(input, output, session, bigquery_data, contracts_df, cre
             ["mins"] + list(input.stats()),
             config.STATS_FLAT,
         )
-        return processing.add_contract_info(summarised_df, contracts_df)
+        summarised_df = processing.add_contract_info(summarised_df, contracts_df)
+
+        # Contract info only exists post-merge, so this filter applies last.
+        return processing.filter_by_contract_end(
+            summarised_df, input.contract_end(), config.UNSIGNED_LABEL
+        )
 
     @reactive.calc
     def display_table_data():
@@ -449,6 +458,7 @@ def player_table_server(input, output, session, bigquery_data, contracts_df, cre
             "team": list(input.team()),
             "player": list(input.player()),
             "position": list(input.position()),
+            "contract_end": list(input.contract_end()),
             "position_separate": input.position_separate(),
             "season_separate": input.season_separate(),
             "comp_separate": input.comp_separate(),
@@ -472,6 +482,9 @@ def player_table_server(input, output, session, bigquery_data, contracts_df, cre
         ui.update_selectize("team", selected=template.get("team", []))
         ui.update_selectize("player", selected=template.get("player", []))
         ui.update_selectize("position", selected=template.get("position", []))
+        # Templates saved before this filter existed have no key, so default
+        # to "no contract filter" rather than dropping every player.
+        ui.update_selectize("contract_end", selected=template.get("contract_end", []))
         ui.update_checkbox("position_separate", value=template.get("position_separate", False))
         ui.update_checkbox("season_separate", value=template.get("season_separate", False))
         ui.update_checkbox("comp_separate", value=template.get("comp_separate", False))
