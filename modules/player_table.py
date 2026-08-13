@@ -16,6 +16,28 @@ from data import processing, queries
 # Operators offered in the highlight rule builder.
 RULE_OPERATORS = {">": ">", "<": "<", ">=": "≥", "<=": "≤", "=": "="}
 
+# Inline so the icon needs no extra dependency; currentColor makes it follow
+# the button's own text colour on hover and focus.
+DOWNLOAD_ICON = ui.HTML(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" '
+    'viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" '
+    'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+    '<path d="M8 2v8.5"/><path d="M4.5 7.5 8 11l3.5-3.5"/>'
+    '<path d="M2.5 13.5h11"/></svg>'
+)
+
+
+def toolbar(*items):
+    """A compact control strip above the table, right-aligned.
+
+    Stands in for ui.toolbar, which is not available in this Shiny version.
+    Add further controls as extra arguments; they lay out left to right.
+    """
+    return ui.div(
+        {"class": "d-flex align-items-center justify-content-end gap-2 mb-2"},
+        *items,
+    )
+
 
 def _table_css(table_id: str) -> str:
     """Column sizing and rotated headers for the player table.
@@ -167,11 +189,6 @@ def build_workbook(df: pd.DataFrame, display_df: pd.DataFrame, rules, scale_by_m
 def player_table_ui(contract_end_choices):
     return ui.nav_panel(
         "Player Table",
-        ui.h2("Player Statistics Table"),
-        ui.p(
-            "Use the filters on the left to customise the player statistics table. "
-            "You can sort by a column by clicking the header."
-        ),
         ui.layout_sidebar(
             ui.sidebar(
                 ui.h4("Templates"),
@@ -233,8 +250,19 @@ def player_table_ui(contract_end_choices):
                 width=450,
             ),
             ui.tags.style(_table_css(resolve_id("table"))),
-            ui.download_button(
-                "download_table", "Download Excel", class_="btn btn-sm btn-outline-success"
+            toolbar(
+                ui.tooltip(
+                    ui.download_button(
+                        "download_table",
+                        None,
+                        icon=DOWNLOAD_ICON,
+                        class_="btn btn-sm btn-outline-success",
+                        # Icon-only, so the button needs an explicit name for
+                        # screen readers.
+                        **{"aria-label": "Download Excel"},
+                    ),
+                    "Download Excel",
+                ),
             ),
             ui.output_data_frame("table"),
         ),

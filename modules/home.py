@@ -13,8 +13,6 @@ from data import queries
 def home_ui():
     return ui.nav_panel(
         "Home",
-        ui.h2("Welcome to the Recruitment Dashboard"),
-        ui.p("Select a page from the navigation above. See the up to date data below."),
         ui.output_ui("fixture_cards"),
     )
 

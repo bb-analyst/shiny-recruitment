@@ -85,8 +85,6 @@ def position_server(input, output, session, position_abbrev, bigquery_data, summ
 def leaderboards_ui():
     return ui.nav_panel(
         "Leaderboards",
-        ui.h2("Leaderboards"),
-        ui.p("See top players in various statistical categories."),
         ui.layout_columns(
             ui.input_selectize(
                 "summary", "Summary Type:",

@@ -47,11 +47,6 @@ def group_server(input, output, session, group, rankings_data, ranking_method):
 def rankings_ui():
     return ui.nav_panel(
         "Season Rankings",
-        ui.h2("Season Rankings"),
-        ui.p(
-            "Season-to-date rankings normalised per 80 minutes. "
-            "Minimum 200 minutes played."
-        ),
         ui.layout_columns(
             ui.input_select(
                 "ranking_method", "Ranking Method:",
