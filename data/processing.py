@@ -1,7 +1,10 @@
 import pandas as pd
+from pathlib import Path
+
+DATA_DIR = Path(__file__).parent
 
 def calculate_rating(df):
-    equivalent_ratings = pd.read_csv("data/equivalent_ratings.csv", index_col="stat_name")
+    equivalent_ratings = pd.read_csv(DATA_DIR / "equivalent_ratings.csv", index_col="stat_name")
     stat_cols = [c for c in equivalent_ratings.index if c in df.columns]
     df['Rating'] = (df[stat_cols].mul(equivalent_ratings.loc[stat_cols, 'stat_weight']).sum(axis=1) * 100).round(0)
     return df
