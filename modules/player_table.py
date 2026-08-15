@@ -277,9 +277,11 @@ def player_table_server(input, output, session, bigquery_data, contracts_df,
 
     templates = reactive.value(queries.fetch_player_table_templates(credentials))
     highlight_rules = reactive.value([])
-    # Bumped on each row click so a repeat click on the same player still fires
-    # a distinct nav request.
+    # Bumped on each genuine open so a nav request is always a distinct value.
     _select_seq = reactive.value(0)
+    # The player the selection last opened, so re-sorting the table (which
+    # re-emits the same selection) doesn't re-open the profile.
+    _last_nav_pid = reactive.value(None)
 
     # -------------------------
     # Filtering and summarising
@@ -623,22 +625,37 @@ def player_table_server(input, output, session, bigquery_data, contracts_df,
 
     @reactive.effect
     def open_profile_on_row_click():
-        """Selecting a row opens that player's profile (see app.py nav_request)."""
+        """Selecting a row opens that player's profile (see app.py nav_request).
+
+        Fires only on a genuine selection *change*. Re-sorting the table
+        re-emits the same selected player, so we compare against the last player
+        we opened and ignore no-op re-emissions. A deselect resets that guard so
+        clicking the same player again (which passes through a deselect) still
+        opens them.
+        """
         if nav_request is None:
             return
         selection = table.cell_selection()
         rows = (selection or {}).get("rows") or ()
         if not rows:
+            _last_nav_pid.set(None)
             return
-        df = summarised_data().reset_index(drop=True)
+        # Read the (unsorted) data non-reactively: this effect should react to
+        # the selection changing, not to the data being re-summarised.
+        with reactive.isolate():
+            df = summarised_data().reset_index(drop=True)
+            last = _last_nav_pid()
         idx = rows[0]
         if "PID" not in df.columns or idx >= len(df):
             return
         pid = int(df.iloc[idx]["PID"])
+        if pid == last:
+            return  # same player still selected (e.g. after a column sort)
         name = str(df.iloc[idx]["Name"]) if "Name" in df.columns else str(pid)
         with reactive.isolate():
             seq = _select_seq() + 1
         _select_seq.set(seq)
+        _last_nav_pid.set(pid)
         nav_request.set((pid, name, seq))
 
     @render.download(filename="player_table.xlsx")
