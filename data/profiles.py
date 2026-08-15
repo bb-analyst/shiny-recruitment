@@ -262,6 +262,10 @@ def temporal_series(window_df: pd.DataFrame, role: str, player_id,
         num = rows[spec["num"]] if spec["num"] in rows else pd.Series(0.0, index=rows.index)
         if spec["den"] == "__mins80__":
             val = np.where(rows["mins"] > 0, num / rows["mins"] * 80 * spec["scale"], np.nan)
+        elif spec["den"] in ("__attackmin__", "__defencemin__"):
+            col = "attackMins" if spec["den"] == "__attackmin__" else "defenceMins"
+            phase = rows[col] if col in rows else pd.Series(np.nan, index=rows.index)
+            val = np.where(phase > 0, num / phase * 40 * spec["scale"], np.nan)
         else:
             den = rows[spec["den"]] if spec["den"] in rows else pd.Series(0.0, index=rows.index)
             val = np.where(den > 0, num / den * spec["scale"], np.nan)

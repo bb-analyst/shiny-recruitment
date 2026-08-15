@@ -122,8 +122,8 @@ METRICS = {
         label="Run metres / 80", num="allRunMetres", den="__mins80__", scale=1,
         sample="allRuns", min_events=20, direction=1, decimals=0, unit="m",
         similarity=True),
-    "runs80": dict(
-        label="Runs / 80", num="allRuns", den="__mins80__", scale=1,
+    "runsAtt": dict(
+        label="Runs / 40 (att)", num="allRuns", den="__attackmin__", scale=1,
         sample="allRuns", min_events=20, direction=1, decimals=1, unit="",
         similarity=True),
     "tackleEff": dict(
@@ -190,8 +190,8 @@ METRICS = {
         label="Kick defusal %", num="kicksDefused", den="kicksFaced", scale=100,
         sample="kicksFaced", min_events=10, direction=1, decimals=1, unit="%",
         similarity=True),
-    "errors80": dict(
-        label="Errors / 80", num="errors", den="__mins80__", scale=1,
+    "errorsAtt": dict(
+        label="Errors / 40 (att)", num="errors", den="__attackmin__", scale=1,
         sample="__mins__", min_events=1, direction=-1, decimals=2, unit="",
         similarity=True),
     "tackleBreaksPerRun": dict(
@@ -202,32 +202,32 @@ METRICS = {
         label="Fast PTB %", num="ptbFast", den="ptbTotal", scale=100,
         sample="ptbTotal", min_events=40, direction=1, decimals=1, unit="%",
         similarity=True),
-    "tackleAttempts80": dict(
-        label="Tackle attempts / 80", num="tackleAttemptsAll", den="__mins80__", scale=1,
+    "tackleAttemptsDef": dict(
+        label="Tackle attempts / 40 (def)", num="tackleAttemptsAll", den="__defencemin__", scale=1,
         sample="tackleAttemptsAll", min_events=40, direction=1, decimals=1, unit="",
         similarity=True),
     "effTacklePct": dict(
         label="Effective tackle %", num="tackles", den="tackleAttemptsAll", scale=100,
         sample="tackleAttemptsAll", min_events=40, direction=1, decimals=1, unit="%",
         similarity=True),
-    "penSixAgains80": dict(
-        label="Pen + 6-agains / 80", num="disciplineConcessions", den="__mins80__", scale=1,
+    "penSixAgainsDef": dict(
+        label="Pen + 6-agains / 40 (def)", num="disciplineConcessions", den="__defencemin__", scale=1,
         sample="__mins__", min_events=1, direction=-1, decimals=2, unit="",
         similarity=True),
-    "lbInvolve80": dict(
-        label="Linebreak involvements / 80", num="lbInvolvements", den="__mins80__", scale=1,
+    "lbInvolveAtt": dict(
+        label="LB involvements / 40 (att)", num="lbInvolvements", den="__attackmin__", scale=1,
         sample="__mins__", min_events=1, direction=1, decimals=2, unit="",
         similarity=True),
-    "tryInvolveAll80": dict(
-        label="Try involvements / 80", num="tryInvolvementsAll", den="__mins80__", scale=1,
+    "tryInvolveAtt": dict(
+        label="Try involvements / 40 (att)", num="tryInvolvementsAll", den="__attackmin__", scale=1,
         sample="__mins__", min_events=1, direction=1, decimals=2, unit="",
         similarity=True),
-    "supports80": dict(
-        label="Supports / 80", num="supports", den="__mins80__", scale=1,
+    "supportsAtt": dict(
+        label="Supports / 40 (att)", num="supports", den="__attackmin__", scale=1,
         sample="__mins__", min_events=1, direction=1, decimals=1, unit="",
         similarity=True),
-    "kickThreats80": dict(
-        label="Kick threats / 80", num="kickThreats", den="__mins80__", scale=1,
+    "kickThreatsAtt": dict(
+        label="Kick threats / 40 (att)", num="kickThreats", den="__attackmin__", scale=1,
         sample="__mins__", min_events=1, direction=1, decimals=2, unit="",
         similarity=True),
 }
@@ -250,45 +250,45 @@ ROLES = {
     # the Centre metrics.
     "Fullback": dict(
         min_minutes=400, min_minutes_recent=200,
-        metrics=["runs80", "metresPerRun", "tackleBreaksPerRun", "fastPtbPct",
-                 "lbInvolve80", "tryInvolveAll80", "kickDefusalPct",
-                 "effTacklePct", "errors80", "penSixAgains80"],
+        metrics=["runsAtt", "metresPerRun", "tackleBreaksPerRun", "fastPtbPct",
+                 "lbInvolveAtt", "tryInvolveAtt", "kickDefusalPct",
+                 "effTacklePct", "errorsAtt", "penSixAgainsDef"],
     ),
     "Wing": dict(
         min_minutes=400, min_minutes_recent=200,
-        metrics=["runs80", "metresPerRun", "tackleBreaksPerRun", "fastPtbPct",
-                 "lbInvolve80", "tryInvolveAll80", "kickDefusalPct",
-                 "effTacklePct", "errors80", "penSixAgains80"],
+        metrics=["runsAtt", "metresPerRun", "tackleBreaksPerRun", "fastPtbPct",
+                 "lbInvolveAtt", "tryInvolveAtt", "kickDefusalPct",
+                 "effTacklePct", "errorsAtt", "penSixAgainsDef"],
     ),
     "Centre": dict(
         min_minutes=400, min_minutes_recent=200,
-        metrics=["runs80", "metresPerRun", "tackleBreaksPerRun", "fastPtbPct",
-                 "lbInvolve80", "tryInvolveAll80", "effTacklePct",
-                 "errors80", "penSixAgains80"],
+        metrics=["runsAtt", "metresPerRun", "tackleBreaksPerRun", "fastPtbPct",
+                 "lbInvolveAtt", "tryInvolveAtt", "effTacklePct",
+                 "errorsAtt", "penSixAgainsDef"],
     ),
     "Half": dict(
         min_minutes=400, min_minutes_recent=200,
-        metrics=["runs80", "supports80", "lbInvolve80", "tryInvolveAll80",
-                 "effTacklePct", "errors80", "penSixAgains80", "kickThreats80"],
+        metrics=["runsAtt", "supportsAtt", "lbInvolveAtt", "tryInvolveAtt",
+                 "effTacklePct", "errorsAtt", "penSixAgainsDef", "kickThreatsAtt"],
     ),
     "Hooker": dict(
         min_minutes=250, min_minutes_recent=130,
-        metrics=["runs80", "metresPerRun", "lbInvolve80",
-                 "effTacklePct", "errors80", "penSixAgains80"],
+        metrics=["runsAtt", "metresPerRun", "lbInvolveAtt",
+                 "effTacklePct", "errorsAtt", "penSixAgainsDef"],
     ),
     # Edge and Middle share one forward-pack metric set (separate pools) so the
     # two roles are read on the same axes.
     "Edge": dict(
         min_minutes=350, min_minutes_recent=180,
-        metrics=["runs80", "metresPerRun", "pcMetresPerRun",
-                 "tackleBreaksPerRun", "fastPtbPct", "tackleAttempts80",
-                 "effTacklePct", "errors80", "penSixAgains80"],
+        metrics=["runsAtt", "metresPerRun", "pcMetresPerRun",
+                 "tackleBreaksPerRun", "fastPtbPct", "tackleAttemptsDef",
+                 "effTacklePct", "errorsAtt", "penSixAgainsDef"],
     ),
     "Middle": dict(
         min_minutes=250, min_minutes_recent=130,
-        metrics=["runs80", "metresPerRun", "pcMetresPerRun",
-                 "tackleBreaksPerRun", "fastPtbPct", "tackleAttempts80",
-                 "effTacklePct", "errors80", "penSixAgains80"],
+        metrics=["runsAtt", "metresPerRun", "pcMetresPerRun",
+                 "tackleBreaksPerRun", "fastPtbPct", "tackleAttemptsDef",
+                 "effTacklePct", "errorsAtt", "penSixAgainsDef"],
     ),
 }
 
