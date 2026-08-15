@@ -235,17 +235,35 @@ def infer_bench_roles(raw: pd.DataFrame, interchange: pd.DataFrame,
 
     nonpos_off = set(pc.BENCH_NONPOSITIONAL_OFF)
     bench = app[app["playerPosition"].isin(pc.BENCH_POSITIONS)]
-    out = {}
-    for g, pid in zip(bench["gameId"], bench["playerId"]):
-        g, pid = int(g), int(pid)
+    bench_keys = [(int(g), int(p)) for g, p in zip(bench["gameId"], bench["playerId"])]
+
+    # Pass 1 — reliable tiers only: a like-for-like forward replacement, else the
+    # player's modal STARTING role. A back subbed off is not a positional swap,
+    # so its (back) replacement role is not trusted here.
+    out, deferred = {}, []
+    for g, pid in bench_keys:
         rep = resolve_repl(g, pid)
         ms = modal_start.get(pid)
-        if rep in nonpos_off:
-            # A back coming off rarely means a like-for-like swap, so trust the
-            # incoming player's own starting role ahead of the replacement.
-            out[(g, pid)] = ms or rep or cascade(g, pid) or pc.BENCH_FALLBACK_ROLE
+        if rep is not None and rep not in nonpos_off:
+            out[(g, pid)] = rep
+        elif ms is not None:
+            out[(g, pid)] = ms
         else:
-            out[(g, pid)] = rep or ms or cascade(g, pid) or pc.BENCH_FALLBACK_ROLE
+            deferred.append((g, pid))
+
+    # Modal INFERRED bench role: the majority of a player's reliably-resolved
+    # appearances. Used for bench players with no starting history who (this game)
+    # replaced a back or had no clean interchange pairing.
+    by_player = {}
+    for (g, pid), r in out.items():
+        by_player.setdefault(pid, []).append(r)
+    modal_inferred = {pid: pd.Series(rs).value_counts().idxmax()
+                      for pid, rs in by_player.items()}
+
+    # Pass 2 — deferred: modal inferred bench role, else event cascade, else fallback.
+    for g, pid in deferred:
+        out[(g, pid)] = (modal_inferred.get(pid) or cascade(g, pid)
+                         or pc.BENCH_FALLBACK_ROLE)
     return out
 
 
