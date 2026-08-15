@@ -70,16 +70,40 @@ BENCH_POSITIONS = ["Interchange"]
 # Listed positions that mean the player did not meaningfully take the field.
 NON_PLAYING_POSITIONS = ["Reserve", "Replacement", "18th Man"]
 
-# Bench inference (open decision #1). Default heuristic, in priority order:
-#   1. If the player also starts anywhere in the window, bench minutes inherit
-#      their most-common starting role (a bench prop covering lock is still a
-#      Middle).
-#   2. Otherwise, a dummy-half-heavy involvement profile => Hooker.
-#   3. Otherwise => the fallback forward role.
-# These thresholds are placeholders to be tuned against real substitution data.
-BENCH_CLASSIFIER = "modal_start_then_fingerprint"
-BENCH_HOOKER_DH80 = 4.0        # dummy-half runs per 80 above which bench => Hooker
-BENCH_FALLBACK_ROLE = "Middle"  # forwards with no starting history default here
+# Bench inference (open decision #1). Roles are assigned PER APPEARANCE (a bench
+# player's role can vary game to game). Priority, when livexy signals are supplied:
+#   1. Replacement: the role of the player they replaced at interchange (longest
+#      stint), chained through interchanges. Carries ~93% of appearances.
+#   2. Their modal starting role in the window (if they start elsewhere).
+#   3. An event-signal cascade from that game's livexy positional data.
+#   4. BENCH_FALLBACK_ROLE.
+# When no livexy signals are supplied (e.g. the dashboard's live path), it falls
+# back to the legacy heuristic: modal starting role, then a dummy-half fingerprint.
+BENCH_CLASSIFIER = "replacement_then_modal_then_signal"
+BENCH_HOOKER_DH80 = 4.0        # legacy fingerprint: dummy-half runs/80 => Hooker
+BENCH_FALLBACK_ROLE = "Middle"  # forwards with no other signal default here
+
+# Per-appearance event-signal cascade thresholds (tier 3). Rates are per 80 of
+# that game's minutes; lat_off is the mean |Y - midfield| of the player's tackles.
+BENCH_LATERAL_CENTER = 343.0    # lateral midfield in livexy Y units
+BENCH_SIGNAL = dict(
+    hooker_dh80=1.5,            # dummy-half runs/80 -> Hooker
+    back_kick80=4.0,           # (kick returns + receipts)/80 -> back three ...
+    back_max_tackles80=22,     #   ... only when tackle load is low (a back)
+    fullback_max_lateral=195,  # fields kicks & central -> Fullback, else Wing
+    half_pass80=20,            # passes/80 -> Half
+    fwd_tackles80=33,          # forward pack: tackle- ...
+    fwd_markers80=20,          #   ... or ruck-marker-heavy
+    middle_markers80=34,       # Middle vs Edge: high markers ...
+    middle_max_lateral=100,    #   ... and central defence -> Middle, else Edge
+    wing_min_lateral=205,      # wide back, no kicks -> Wing, else Centre
+)
+
+# When the player subbed OFF held one of these (back) roles, the swap is rarely
+# a like-for-like positional change — the backline reshuffles and the incoming
+# bench player is usually a forward/utility. So for these, the incoming player's
+# modal starting role is trusted AHEAD of the replacement role.
+BENCH_NONPOSITIONAL_OFF = ["Fullback", "Wing", "Centre", "Half"]
 
 # ---------------------------------------------------------------------------
 # Metric catalogue

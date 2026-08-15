@@ -47,13 +47,17 @@ _DERIVED_COUNTS = {
 }
 
 
-def prepare_match_data(df: pd.DataFrame) -> pd.DataFrame:
+def prepare_match_data(df: pd.DataFrame, bench_roles: dict | None = None) -> pd.DataFrame:
     """Clean rows, derive helper counts, and assign an analytical role per row.
 
     Returns match-level rows (one per player-appearance) with added columns:
     ``role`` (analytical positional role), the derived count columns, and a
     global ``round_seq`` ordering competition rounds chronologically across
     the selected scope (finals included in sequence).
+
+    ``bench_roles`` optionally maps ``(gameId, playerId) -> role`` for bench
+    appearances (see :func:`infer_bench_roles`); when omitted, bench roles fall
+    back to the legacy modal-start / dummy-half heuristic.
     """
     if df is None or len(df) == 0:
         return pd.DataFrame()
@@ -84,18 +88,19 @@ def prepare_match_data(df: pd.DataFrame) -> pd.DataFrame:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
-    df = _assign_roles(df)
+    df = _assign_roles(df, bench_roles)
     df = _add_round_sequence(df)
     return df
 
 
-def _assign_roles(df: pd.DataFrame) -> pd.DataFrame:
+def _assign_roles(df: pd.DataFrame, bench_roles: dict | None = None) -> pd.DataFrame:
     """Assign each appearance an analytical role, inferring bench roles.
 
     Starters map straight from their listed position. Bench (Interchange) rows
-    are resolved with the configured heuristic: inherit the player's most
-    common starting role over the scope, else fall back to a stat fingerprint
-    (dummy-half-heavy => Hooker, otherwise the fallback forward role).
+    take their per-appearance role from ``bench_roles`` (``(gameId, playerId) ->
+    role``, see :func:`infer_bench_roles`) when supplied; any bench row not
+    covered there falls back to the legacy heuristic — the player's most common
+    starting role over the scope, else a dummy-half fingerprint.
 
     Kept in sync with the precompute job's copy so the reconstructed temporal
     window matches the pool the measures were computed in.
@@ -126,20 +131,122 @@ def _assign_roles(df: pd.DataFrame) -> pd.DataFrame:
     else:
         fingerprint = pd.Series(dtype=object)
 
-    def bench_role(pid):
+    def legacy_bench_role(pid):
         if pid in modal_start.index:
             return modal_start.loc[pid]
         if pid in fingerprint.index:
             return fingerprint.loc[pid]
         return pc.BENCH_FALLBACK_ROLE
 
-    bench_roles = df.loc[is_bench, "playerId"].map(bench_role)
+    def bench_role(gid, pid):
+        # Per-appearance role from the resolver; legacy heuristic if uncovered.
+        if bench_roles:
+            r = bench_roles.get((int(gid), int(pid)))
+            if r is not None:
+                return r
+        return legacy_bench_role(pid)
+
+    resolved = [bench_role(g, p) for g, p in
+                zip(df.loc[is_bench, "gameId"], df.loc[is_bench, "playerId"])]
     role = role.copy()
-    role.loc[is_bench] = bench_roles
+    role.loc[is_bench] = pd.Series(resolved, index=df.index[is_bench])
 
     df = df.copy()
     df["role"] = role
     return df[df["role"].notna()]
+
+
+def infer_bench_roles(raw: pd.DataFrame, interchange: pd.DataFrame,
+                      signals: pd.DataFrame) -> dict:
+    """Per-appearance bench roles, keyed ``(gameId, playerId) -> role``.
+
+    Roles vary game to game, so each bench appearance is resolved on its own.
+    Tiers: (1) the role of the player they replaced at interchange — the longest
+    stint, chained through interchanges when they replaced another bench player;
+    (2) the player's modal starting role in the scope; (3) an event-signal
+    cascade from that game's livexy positional data; (4) ``BENCH_FALLBACK_ROLE``.
+    """
+    if raw is None or raw.empty:
+        return {}
+    app = raw[raw["mins"].fillna(0) > 0]
+    app = app[~app["playerPosition"].isin(pc.NON_PLAYING_POSITIONS)]
+    starter = app[~app["playerPosition"].isin(pc.BENCH_POSITIONS)]
+
+    srole = {(int(g), int(p)): pc.POSITION_TO_ROLE[pos]
+             for g, p, pos in zip(starter["gameId"], starter["playerId"],
+                                  starter["playerPosition"]) if pos in pc.POSITION_TO_ROLE}
+    modal_start = (starter.assign(_r=starter["playerPosition"].map(pc.POSITION_TO_ROLE))
+                   .dropna(subset=["_r"]).groupby("playerId")["_r"]
+                   .agg(lambda s: s.value_counts().idxmax()).to_dict())
+    mins = {(int(g), int(p)): float(m) for g, p, m in
+            zip(app["gameId"], app["playerId"], app["mins"])}
+
+    # Replacement: pair each interchange-IN to the OUT at the same game-second,
+    # then keep, per incoming player, the swap that began their longest stint.
+    replaced = {}
+    if interchange is not None and not interchange.empty:
+        ic = interchange.dropna(subset=["direction"])
+        outs = ic[ic["direction"] == "OUT"]
+        swap = ic[ic["direction"] == "IN"].merge(
+            outs, on=["gameId", "teamId", "GS"], suffixes=("_in", "_out"))
+        out_times = {k: sorted(int(x) for x in grp["GS"])
+                     for k, grp in outs.groupby(["gameId", "playerId"])}
+
+        def stint(g, pid, t_in):
+            later = [o for o in out_times.get((g, pid), []) if o >= t_in]
+            return (later[0] - t_in) if later else 10 ** 9
+
+        if not swap.empty:
+            swap = swap.assign(_stint=[stint(r.gameId, r.playerId_in, r.GS)
+                                       for r in swap.itertuples()])
+            longest = swap.sort_values("_stint").groupby(["gameId", "playerId_in"]).tail(1)
+            replaced = {(int(r.gameId), int(r.playerId_in)): int(r.playerId_out)
+                        for r in longest.itertuples()}
+
+    def resolve_repl(g, pid, depth=0):
+        if (g, pid) in srole:
+            return srole[(g, pid)]
+        rep = replaced.get((g, pid))
+        if rep is None or depth > 6:
+            return None
+        return resolve_repl(g, rep, depth + 1)
+
+    sigm = {(int(r.gameId), int(r.playerId)): r for r in signals.itertuples()} \
+        if signals is not None and not signals.empty else {}
+    S = pc.BENCH_SIGNAL
+
+    def cascade(g, pid):
+        s = sigm.get((g, pid))
+        m = mins.get((g, pid), 0)
+        if s is None or m <= 0:
+            return None
+        r = lambda v: v / m * 80
+        if r(s.dh) >= S["hooker_dh80"]:
+            return "Hooker"
+        lat = s.lat_w / max(s.tk, 1)
+        if (r(s.kr) + r(s.krc)) >= S["back_kick80"] and r(s.tk) < S["back_max_tackles80"]:
+            return "Fullback" if lat <= S["fullback_max_lateral"] else "Wing"
+        if r(s.pas) >= S["half_pass80"]:
+            return "Half"
+        if r(s.tk) >= S["fwd_tackles80"] or r(s.mk) >= S["fwd_markers80"]:
+            return ("Middle" if (r(s.mk) >= S["middle_markers80"]
+                                 and lat <= S["middle_max_lateral"]) else "Edge")
+        return "Wing" if lat >= S["wing_min_lateral"] else "Centre"
+
+    nonpos_off = set(pc.BENCH_NONPOSITIONAL_OFF)
+    bench = app[app["playerPosition"].isin(pc.BENCH_POSITIONS)]
+    out = {}
+    for g, pid in zip(bench["gameId"], bench["playerId"]):
+        g, pid = int(g), int(pid)
+        rep = resolve_repl(g, pid)
+        ms = modal_start.get(pid)
+        if rep in nonpos_off:
+            # A back coming off rarely means a like-for-like swap, so trust the
+            # incoming player's own starting role ahead of the replacement.
+            out[(g, pid)] = ms or rep or cascade(g, pid) or pc.BENCH_FALLBACK_ROLE
+        else:
+            out[(g, pid)] = rep or ms or cascade(g, pid) or pc.BENCH_FALLBACK_ROLE
+    return out
 
 
 def _add_round_sequence(df: pd.DataFrame) -> pd.DataFrame:
