@@ -25,13 +25,19 @@
         "dummyHalfRunMetres":"DH Metres",
         "tries":"Try",
         "tryAssists":"Try Ass",
+        "tryInvolvement":"Try Inv",
         "linebreaks":"LB",
         "linebreakAssists":"LB Ass",
+        "linebreakInvolvement":"LB Inv",
         "tackleBreaks":"TB",
         "supports":"Sup",
         "offloads":"Offload",
         "passes":"Pass",
-        "ptbAverage":"PTB Speed"
+        "ptbAverage":"PTB Speed",
+        "ptbZeroToOne":"PTB 0-1s",
+        "ptbOneToTwo":"PTB 1-2s",
+        "ptbTwoToThree":"PTB 2-3s",
+        "ptbTotal":"PTB Total"
     },
     "Defence": {
         "tackles":"Tk",
@@ -57,6 +63,7 @@
         "kickLineBreak":"Kick LB",
         "fortyTwentyKicks":"40/20",
         "forcedDropOutKicker":"Forced DO",
+        "longKicksSpace":"Long Kick Space",
         "kickDead":"Kick Dead",
         "allGoals":"Goals Made",
         "allGoalsMissed":"Goals Mis",

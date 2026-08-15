@@ -141,6 +141,47 @@ def fetch_bq_rankings_data(client, comps, seasons):
 
 
 
+def fetch_bq_profile_data(client, comps):
+    """Read precomputed profile measures from the profile_derived table.
+
+    That table is produced by the separate ``profile-precompute`` project
+    (github.com/bb-analyst/profile-precompute), scheduled outside this app.
+
+    Returns the long derived table for the given competitions, all windows
+    (20R + 10R), at each competition's **most recent** end-round. "Most recent"
+    is by ``(end_seasonId, end_roundId)`` — season first — so a finals round
+    (high roundId) in an older season can never outrank the current season.
+    """
+    query = """
+        WITH latest AS (
+            SELECT competitionId, end_seasonId, end_roundId
+            FROM (
+                SELECT competitionId, end_seasonId, end_roundId,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY competitionId
+                           ORDER BY end_seasonId DESC, end_roundId DESC
+                       ) AS rn
+                FROM (
+                    SELECT DISTINCT competitionId, end_seasonId, end_roundId
+                    FROM `rugbaleeg.statsperform.profile_derived`
+                    WHERE competitionId IN UNNEST(@comps)
+                )
+            )
+            WHERE rn = 1
+        )
+        SELECT d.*
+        FROM `rugbaleeg.statsperform.profile_derived` d
+        JOIN latest l
+          ON d.competitionId = l.competitionId
+         AND d.end_seasonId = l.end_seasonId
+         AND d.end_roundId = l.end_roundId
+    """
+    job_config = bigquery.QueryJobConfig(query_parameters=[
+        bigquery.ArrayQueryParameter("comps", "INT64", [int(c) for c in comps]),
+    ])
+    return client.query(query, job_config=job_config).to_dataframe()
+
+
 def fetch_player_table_templates(credentials):
     client = storage.Client(credentials=credentials)
     bucket = client.bucket("rugbaleeg-bucket")

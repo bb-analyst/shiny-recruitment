@@ -101,3 +101,5 @@ wcwidth==0.2.14
 websockets==15.0.1
 widgetsnbextension==4.0.15
 yarl==1.22.0
+shinywidgets==0.8.1
+anywidget==0.11.0

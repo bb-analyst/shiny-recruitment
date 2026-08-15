@@ -13,8 +13,8 @@ from data import client as bq_client
 from data import processing, queries
 from modules.home import home_server, home_ui
 from modules.leaderboards import leaderboards_server, leaderboards_ui
+from modules.player_profile import player_profile_server, player_profile_ui
 from modules.player_table import player_table_server, player_table_ui
-from modules.rankings import rankings_server, rankings_ui
 
 credentials = bq_client.get_credentials()
 client = bq_client.get_bq_client(credentials)
@@ -31,9 +31,9 @@ CONTRACT_END_CHOICES = [config.UNSIGNED_LABEL] + [
 
 app_ui = ui.page_navbar(
     home_ui("home"),
+    player_profile_ui("player_profile"),
     player_table_ui("player_table", CONTRACT_END_CHOICES),
     leaderboards_ui("leaderboards"),
-    rankings_ui("rankings"),
     ui.nav_spacer(),
     ui.nav_control(
         ui.div(
@@ -58,7 +58,9 @@ app_ui = ui.page_navbar(
         )
     ),
     title="Recruitment Dashboard",
-    fillable=True,
+    # Keep the grid/table pages filling the viewport, but let the long
+    # Player Profile page flow and scroll normally instead of being clipped.
+    fillable=["Home", "Player Table", "Leaderboards"],
     theme=theme.flatly(),
     id="navbar",
     header=ui.TagList(
@@ -83,6 +85,22 @@ def server(input, output, session):
         return comps, seasons
 
     @reactive.calc
+    def selected_comps():
+        comps, _ = selected_scope()
+        return comps
+
+    # Cross-page navigation: a page sets this to request opening a player's
+    # profile; the effect below switches to the Player Profile tab and the
+    # profile module (which shares this value) selects the player.
+    nav_request = reactive.value(None)
+
+    @reactive.effect
+    def _open_player_profile():
+        if nav_request() is None:
+            return
+        ui.update_navs("navbar", selected="Player Profile")
+
+    @reactive.calc
     def bigquery_data():
         reactive.invalidate_later(config.PLAYER_DATA_REFRESH_SECONDS)
         comps, seasons = selected_scope()
@@ -90,17 +108,10 @@ def server(input, output, session):
         df = queries.fetch_bq_player_data(client, comps, seasons, config.QUERY_STATS)
         return processing.calculate_rating(df)
 
-    @reactive.calc
-    def rankings_data():
-        reactive.invalidate_later(config.PLAYER_DATA_REFRESH_SECONDS)
-        comps, seasons = selected_scope()
-
-        return queries.fetch_bq_rankings_data(client, comps, seasons)
-
     home_server("home", client)
-    player_table_server("player_table", bigquery_data, contracts_df, credentials)
+    player_profile_server("player_profile", client, selected_comps, nav_request)
+    player_table_server("player_table", bigquery_data, contracts_df, credentials, nav_request)
     leaderboards_server("leaderboards", bigquery_data)
-    rankings_server("rankings", rankings_data)
 
 
 app = App(app_ui, server, static_assets=config.APP_DIR / "www")

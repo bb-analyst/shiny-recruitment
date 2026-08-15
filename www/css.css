@@ -86,3 +86,197 @@
 .row {
     justify-content: center;
 }
+/* ============================================================
+   Player Profile page
+   ============================================================ */
+
+.pp-controls {
+    margin: 0.5rem 0 1rem 0;
+}
+.pp-controls .control-label {
+    font-weight: 600;
+    color: #540c2b;
+}
+.pp-single-role {
+    padding: 6px 0;
+    font-weight: 600;
+    color: #540c2b;
+}
+
+/* Header */
+.pp-header {
+    border-left: 5px solid #540c2b;
+    padding: 0.4rem 0 0.6rem 1rem;
+    margin-bottom: 1rem;
+}
+.pp-name-row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+}
+.pp-name {
+    margin: 0;
+    color: #540c2b;
+    font-weight: 700;
+}
+.pp-team {
+    color: #777;
+    font-size: 1rem;
+    font-weight: 600;
+}
+.pp-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0.6rem 0 0.4rem 0;
+}
+.pp-chip {
+    background: #f4eef1;
+    border: 1px solid #e4d6dd;
+    border-radius: 6px;
+    padding: 3px 10px;
+    font-size: 0.82rem;
+    display: flex;
+    gap: 6px;
+    align-items: baseline;
+}
+.pp-chip-k { color: #9a7c88; text-transform: uppercase; font-size: 0.68rem; letter-spacing: 0.03em; }
+.pp-chip-v { color: #540c2b; font-weight: 700; }
+.pp-poolnote {
+    color: #555;
+    font-style: italic;
+    font-size: 0.9rem;
+}
+.pp-empty { padding: 1rem 0 0 1rem; }
+
+/* Metric rows */
+.pp-metrics { display: flex; flex-direction: column; gap: 0.85rem; }
+.pp-metric-row { }
+.pp-metric-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+}
+.pp-metric-label { font-weight: 600; color: #333; }
+.pp-value { font-weight: 700; color: #540c2b; font-variant-numeric: tabular-nums; }
+.pp-bar {
+    position: relative;
+    height: 14px;
+    background: #eef0f2;
+    border-radius: 7px;
+    overflow: hidden;
+    margin: 3px 0;
+}
+.pp-bar-fill {
+    height: 100%;
+    border-radius: 7px 0 0 7px;
+    transition: width 0.3s ease;
+}
+.pp-insufficient {
+    position: absolute;
+    top: 0; left: 8px;
+    font-size: 0.72rem;
+    color: #999;
+    line-height: 14px;
+}
+.pp-metric-foot {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 0.82rem;
+}
+.pp-pct { font-weight: 700; }
+.pp-recent { color: #666; }
+.pp-up { color: #1a9850; font-weight: 700; }
+.pp-down { color: #d73027; font-weight: 700; }
+.pp-flat { color: #999; font-weight: 700; }
+
+.pp-caption { font-size: 0.78rem; color: #999; padding: 4px 2px 0; }
+.pp-card-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; width: 100%; }
+.pp-card-head .shiny-input-radiogroup { margin: 0; }
+
+/* Similar players */
+.pp-sim-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: 0.75rem;
+}
+.pp-sim-card {
+    border: 1px solid #e4d6dd;
+    border-radius: 8px;
+    padding: 0.6rem 0.75rem;
+    background: #fbf8fa;
+}
+.pp-sim-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+.pp-sim-name { font-weight: 700; color: #540c2b; }
+.pp-sim-team { color: #999; font-size: 0.8rem; font-weight: 600; }
+.pp-sim-line { font-size: 0.8rem; color: #555; }
+.pp-sim-k { color: #9a7c88; font-weight: 600; }
+
+/* This page uses left-aligned rows rather than the global centring. */
+.pp-header, .pp-controls { justify-content: flex-start; }
+
+.pp-source {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-left: auto;
+}
+.pp-source-table { background: #e6f4ea; color: #1a7a3c; border: 1px solid #bfe3cb; }
+.pp-source-live  { background: #fdf0e3; color: #a8620a; border: 1px solid #f2d5ac; }
+
+/* Similar-players comparison table */
+.pp-st-wrap { overflow-x: auto; }
+.pp-st-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.86rem;
+}
+.pp-st-table thead th {
+    position: sticky; top: 0;
+    background: #fff;
+    text-align: center;
+    font-weight: 600;
+    font-size: 0.72rem;
+    color: #666;
+    padding: 6px 8px;
+    border-bottom: 2px solid #eadfe4;
+    white-space: nowrap;
+}
+.pp-st-table thead th.pp-st-player-h { text-align: left; }
+.pp-st-player { text-align: left; padding: 6px 10px; white-space: nowrap; }
+.pp-st-name { font-weight: 700; color: #333; }
+.pp-st-team { font-size: 0.72rem; color: #999; font-weight: 600; }
+.pp-st-cell {
+    text-align: center;
+    padding: 5px 8px;
+    border-bottom: 1px solid #f0eef0;
+    font-variant-numeric: tabular-nums;
+}
+.pp-st-val { font-weight: 700; color: #2b2b2b; line-height: 1.1; }
+.pp-st-pct { font-size: 0.68rem; color: #888; }
+.pp-st-na { color: #ccc; }
+.pp-st-selected td { background: #f4eef1 !important; }
+.pp-st-selected .pp-st-name { color: #540c2b; }
+.pp-st-selected {
+    outline: 2px solid #540c2b;
+}
+.pp-st-selected td:first-child { border-left: 3px solid #540c2b; }
+
+.pp-poolnote-sub {
+    color: #888;
+    font-size: 0.8rem;
+    margin-top: 2px;
+}
+
+/* The competition/season pickers in the navbar are wrapped in Shiny's
+   .form-group.shiny-input-container, which carries a 16px bottom margin. That
+   stretched the flex nav row to 56px and pushed the active-tab underline up.
+   Drop the margin (navbar only) so the bar sizes to the nav links. */
+.navbar .shiny-input-container {
+    margin-bottom: 0 !important;
+}

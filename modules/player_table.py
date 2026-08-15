@@ -264,16 +264,22 @@ def player_table_ui(contract_end_choices):
                     "Download Excel",
                 ),
             ),
+            ui.div("Tip: click a player row to open their profile.",
+                   class_="pp-caption", style="margin:2px 2px 4px;"),
             ui.output_data_frame("table"),
         ),
     )
 
 
 @module.server
-def player_table_server(input, output, session, bigquery_data, contracts_df, credentials):
+def player_table_server(input, output, session, bigquery_data, contracts_df,
+                        credentials, nav_request=None):
 
     templates = reactive.value(queries.fetch_player_table_templates(credentials))
     highlight_rules = reactive.value([])
+    # Bumped on each row click so a repeat click on the same player still fires
+    # a distinct nav request.
+    _select_seq = reactive.value(0)
 
     # -------------------------
     # Filtering and summarising
@@ -612,7 +618,28 @@ def player_table_server(input, output, session, bigquery_data, contracts_df, cre
                     },
                 ))
 
-        return render.DataTable(display_df, styles=styles, width="100%", height="99%")
+        return render.DataTable(display_df, styles=styles, width="100%", height="99%",
+                                selection_mode="row")
+
+    @reactive.effect
+    def open_profile_on_row_click():
+        """Selecting a row opens that player's profile (see app.py nav_request)."""
+        if nav_request is None:
+            return
+        selection = table.cell_selection()
+        rows = (selection or {}).get("rows") or ()
+        if not rows:
+            return
+        df = summarised_data().reset_index(drop=True)
+        idx = rows[0]
+        if "PID" not in df.columns or idx >= len(df):
+            return
+        pid = int(df.iloc[idx]["PID"])
+        name = str(df.iloc[idx]["Name"]) if "Name" in df.columns else str(pid)
+        with reactive.isolate():
+            seq = _select_seq() + 1
+        _select_seq.set(seq)
+        nav_request.set((pid, name, seq))
 
     @render.download(filename="player_table.xlsx")
     def download_table():
