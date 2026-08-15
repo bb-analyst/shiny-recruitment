@@ -111,7 +111,7 @@ BENCH_FALLBACK_ROLE = "Middle"  # forwards with no starting history default here
 
 METRICS = {
     "metresPerRun": dict(
-        label="Metres per run", num="allRunMetres", den="allRuns", scale=1,
+        label="Metres / run", num="allRunMetres", den="allRuns", scale=1,
         sample="allRuns", min_events=20, direction=1, decimals=1, unit="m",
         similarity=True),
     "pcMetresPerRun": dict(
