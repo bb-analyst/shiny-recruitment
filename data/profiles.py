@@ -172,11 +172,23 @@ def last_n_rounds(single_comp_df: pd.DataFrame, n: int) -> pd.DataFrame:
 # Similarity (over the pool's stored standardised measures)
 # ---------------------------------------------------------------------------
 
-def _representation_matrix(long_df: pd.DataFrame, role: str) -> tuple[pd.DataFrame, list]:
-    """Player x similarity-metric matrix in the configured representation."""
-    metrics = [k for k in pc.ROLES[role]["metrics"]
+def similarity_metrics(role: str, metric_keys: list | None = None) -> list:
+    """The metrics used for similarity: the requested subset, or all eligible."""
+    allowed = [k for k in pc.ROLES[role]["metrics"]
                if pc.METRICS[k].get("similarity", False)]
-    rep = pc.SIMILARITY["representation"]
+    if metric_keys:
+        chosen = [k for k in allowed if k in set(metric_keys)]
+        if chosen:
+            return chosen
+    return allowed
+
+
+def _representation_matrix(long_df: pd.DataFrame, role: str,
+                           representation: str | None = None,
+                           metric_keys: list | None = None) -> tuple[pd.DataFrame, list]:
+    """Player x similarity-metric matrix in the chosen representation."""
+    metrics = similarity_metrics(role, metric_keys)
+    rep = representation or pc.SIMILARITY["representation"]
     sub = long_df[long_df["metric"].isin(metrics)]
     mat = sub.pivot_table(index="player_id", columns="metric", values=rep, aggfunc="first")
     # Preserve configured metric order.
@@ -185,9 +197,10 @@ def _representation_matrix(long_df: pd.DataFrame, role: str) -> tuple[pd.DataFra
 
 
 def similar_players(long_df: pd.DataFrame, role: str, player_id, names: dict,
-                    teams: dict) -> list[dict]:
+                    teams: dict, representation: str | None = None,
+                    metric_keys: list | None = None) -> list[dict]:
     """Nearest statistical neighbours within the 20-round role pool."""
-    mat, metrics = _representation_matrix(long_df, role)
+    mat, metrics = _representation_matrix(long_df, role, representation, metric_keys)
     if player_id not in mat.index or mat.shape[1] == 0:
         return []
 
@@ -364,14 +377,10 @@ def build_profile_from_table(derived: pd.DataFrame, match_df: pd.DataFrame,
     window = _window_bounds(head, pc.CANONICAL_WINDOW)
     window_recent = _window_bounds(r10.iloc[0], pc.RECENT_WINDOW) if not r10.empty else None
 
-    # Nearest neighbours from the stored measures of this role's pool.
+    # This role's pool (used for the temporal pool-percentile view). The
+    # nearest-neighbour computation is done separately via compute_similarity so
+    # the UI can vary the representation and metric subset interactively.
     pool20 = d20[d20["role"] == selected_role]
-    names = dict(zip(pool20["player_id"], pool20["player_name"]))
-    teams = dict(zip(pool20["player_id"], pool20["team"]))
-    similar = similar_players(pool20, selected_role, player_id, names, teams)
-    similar_table = similarity_table(
-        pool20, selected_role, player_id,
-        [s["player_id"] for s in similar], names, teams)
 
     # Temporal + match log from the reconstructed window of match-level rows.
     temporal, match_log = {}, pd.DataFrame()
@@ -402,11 +411,37 @@ def build_profile_from_table(derived: pd.DataFrame, match_df: pd.DataFrame,
         "window": window,
         "window_recent": window_recent,
         "metrics": metrics_payload,
-        "similar": similar,
-        "similar_table": similar_table,
         "temporal": temporal,
         "match_log": match_log,
     }
+
+
+def compute_similarity(derived: pd.DataFrame, competition: str, role: str,
+                       player_id, representation: str | None = None,
+                       metric_keys: list | None = None) -> dict:
+    """Nearest neighbours + comparison table for a role pool, on demand.
+
+    ``representation`` picks which stored measure feeds the distance
+    ("z_score" / "robust_z" / "percentile" / "minmax"); ``metric_keys`` limits
+    similarity to a subset of the role's metrics. Both default to the config
+    (all similarity metrics, SIMILARITY["representation"]) when None.
+    """
+    empty = {"similar": [], "similar_table": None}
+    if derived is None or derived.empty:
+        return empty
+    pool = derived[(derived["window_label"] == "20R")
+                   & (derived["competitionName"] == competition)
+                   & (derived["role"] == role)]
+    if pool.empty:
+        return empty
+    names = dict(zip(pool["player_id"], pool["player_name"]))
+    teams = dict(zip(pool["player_id"], pool["team"]))
+    similar = similar_players(pool, role, player_id, names, teams,
+                              representation=representation, metric_keys=metric_keys)
+    table = similarity_table(pool, role, player_id,
+                             [s["player_id"] for s in similar], names, teams,
+                             metric_keys=metric_keys)
+    return {"similar": similar, "similar_table": table}
 
 
 def _window_bounds(row, n_rounds: int) -> dict:
@@ -422,15 +457,21 @@ def _window_bounds(row, n_rounds: int) -> dict:
 
 
 def similarity_table(pool20: pd.DataFrame, role: str, selected_id,
-                     neighbour_ids: list, names: dict, teams: dict) -> dict:
+                     neighbour_ids: list, names: dict, teams: dict,
+                     metric_keys: list | None = None) -> dict:
     """Side-by-side metric table for the selected player + nearest neighbours.
 
     The selected player is first (and flagged), then neighbours in similarity
     order. Each cell carries the raw value, its positional percentile and
     whether the player met the metric's sample threshold, so the UI can show
     the actual numbers rather than only a ranked list.
+
+    All of the role's defining metrics are shown as columns for full context;
+    ``metric_keys`` marks which ones fed the similarity calculation (via each
+    column's ``in_calc`` flag) so the UI can highlight those headers.
     """
     metrics = pc.ROLES[role]["metrics"]
+    in_calc = set(similarity_metrics(role, metric_keys))
     lut = {(r.player_id, r.metric): r for r in pool20.itertuples()}
 
     def row_for(pid, is_selected):
@@ -457,7 +498,7 @@ def similarity_table(pool20: pd.DataFrame, role: str, selected_id,
     rows = [row_for(selected_id, True)] + [row_for(pid, False) for pid in neighbour_ids]
     metric_defs = [
         {"key": k, "label": pc.METRICS[k]["label"], "unit": pc.METRICS[k]["unit"],
-         "decimals": pc.METRICS[k]["decimals"]}
+         "decimals": pc.METRICS[k]["decimals"], "in_calc": k in in_calc}
         for k in metrics
     ]
     return {"metrics": metric_defs, "rows": rows}

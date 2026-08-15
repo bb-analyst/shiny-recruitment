@@ -66,6 +66,7 @@ app_ui = ui.page_navbar(
     header=ui.TagList(
         ui.tags.link(href="css.css", rel="stylesheet"),
         ui.tags.script(src="fixture-click.js"),
+        ui.tags.script(src="sim-metric-click.js"),
     ),
 )
 

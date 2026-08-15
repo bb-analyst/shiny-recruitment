@@ -149,10 +149,23 @@ def _analytical_body():
         ),
         ui.card(
             ui.card_header("Most similar current players"),
+            ui.div(
+                ui.input_select(
+                    "sim_representation", "Method",
+                    choices={
+                        "minmax": "Min–max", "z_score": "Z-score",
+                        "robust_z": "Robust z", "percentile": "Percentile",
+                    },
+                    selected="minmax", width="150px",
+                ),
+                class_="pp-sim-controls",
+            ),
             ui.output_ui("similar"),
             ui.div(
-                "Selected player highlighted at top, then nearest profiles. "
-                "Each cell shows the 20-round value with its positional percentile.",
+                "Click a column header to include/exclude that metric from the "
+                "similarity calculation — highlighted headers are included. "
+                "Selected player highlighted at top; cells show the 20-round "
+                "value with its positional percentile.",
                 class_="pp-caption",
             ),
         ),
@@ -356,24 +369,83 @@ def player_profile_server(input, output, session, client, comps, nav_request=Non
 
     # ---- similar players (comparison table) ------------------------------
 
-    @render.ui
-    def similar():
+    # Metrics currently included in the similarity calc (a set of metric keys),
+    # toggled by clicking column headers. Reset to all when the role changes.
+    sim_selected = reactive.value(None)
+    _sim_last_role = reactive.value(None)
+
+    @reactive.effect
+    def _sync_sim_domain():
         p = profile()
         if p is None:
-            return None
-        st = p.get("similar_table")
+            return
+        role = p["selected_role"]
+        with reactive.isolate():
+            last, cur = _sim_last_role(), sim_selected()
+        if role != last:
+            _sim_last_role.set(role)
+            sim_selected.set(set(profiles.similarity_metrics(role)))
+        elif cur is None:
+            sim_selected.set(set(profiles.similarity_metrics(role)))
+
+    @reactive.effect
+    @reactive.event(input.sim_toggle)
+    def _toggle_metric():
+        payload = input.sim_toggle()
+        key = payload.get("metric") if isinstance(payload, dict) else payload
+        p = profile()
+        if p is None or not key:
+            return
+        allowed = profiles.similarity_metrics(p["selected_role"])
+        if key not in allowed:
+            return
+        with reactive.isolate():
+            cur = set(sim_selected() or allowed)
+        if key in cur:
+            if len(cur) > 1:      # always keep at least one metric
+                cur.discard(key)
+        else:
+            cur.add(key)
+        sim_selected.set(cur)
+
+    @reactive.calc
+    def similarity():
+        p = profile()
+        if p is None:
+            return {"similar": [], "similar_table": None}
+        sel = sim_selected()
+        return profiles.compute_similarity(
+            derived_data(), p["competition"], p["selected_role"], p["player_id"],
+            representation=input.sim_representation(),
+            metric_keys=list(sel) if sel else None,
+        )
+
+    @render.ui
+    def similar():
+        st = similarity().get("similar_table")
         if not st or len(st["rows"]) <= 1:
             return ui.p("No comparable players found in the current pool.",
                         class_="pp-caption")
-        return _similar_table_ui(st)
+        return _similar_table_ui(st, session.ns("sim_toggle"))
 
 
-def _similar_table_ui(st):
-    """Comparison table: selected player (highlighted, top) + nearest profiles."""
+def _similar_table_ui(st, sim_input_id):
+    """Comparison table: selected player (highlighted, top) + nearest profiles.
+
+    Column headers are clickable: a click toggles that metric in/out of the
+    similarity calculation (handled by sim-metric-click.js, which sets the
+    ``sim_input_id`` Shiny input).
+    """
     metrics = st["metrics"]
     header = ui.tags.tr(
         ui.tags.th("Player", class_="pp-st-player-h"),
-        *[ui.tags.th(m["label"]) for m in metrics],
+        *[ui.tags.th(
+            m["label"],
+            class_=("pp-st-incalc" if m.get("in_calc") else "pp-st-notcalc")
+                   + " pp-st-clickable",
+            title="Click to include/exclude this metric",
+            **{"data-metric": m["key"]},
+        ) for m in metrics],
     )
     body = []
     for row in st["rows"]:
@@ -400,6 +472,7 @@ def _similar_table_ui(st):
     return ui.div(
         ui.tags.table(ui.tags.thead(header), ui.tags.tbody(*body), class_="pp-st-table"),
         class_="pp-st-wrap",
+        **{"data-sim-input": sim_input_id},
     )
 
 

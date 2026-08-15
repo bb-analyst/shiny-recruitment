@@ -280,3 +280,41 @@
 .navbar .shiny-input-container {
     margin-bottom: 0 !important;
 }
+
+/* Similarity controls (method + metric subset) */
+.pp-sim-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.4rem 1.25rem;
+    margin-bottom: 0.6rem;
+}
+.pp-sim-controls .shiny-input-container { margin-bottom: 0 !important; }
+.pp-sim-controls label { font-weight: 600; font-size: 0.8rem; color: #540c2b; }
+.pp-sim-controls .shiny-options-group { padding-top: 4px; }
+.pp-sim-controls .checkbox-inline,
+.pp-sim-controls .form-check-inline { font-size: 0.82rem; margin-right: 0.5rem; }
+
+/* Highlight the headers of metrics that fed the similarity calculation.
+   Blue so it reads as "selected" without clashing with the red-amber-green
+   percentile colouring in the cells. */
+.pp-st-table thead th.pp-st-incalc {
+    color: #1a5a99;
+    background: #e7f1fb;
+    border-bottom: 2px solid #2b7fd4;
+    font-weight: 700;
+}
+.pp-st-table thead th.pp-st-notcalc {
+    color: #b7b7b7;
+    font-weight: 500;
+}
+
+/* Clickable similarity column headers */
+.pp-st-table thead th.pp-st-clickable {
+    cursor: pointer;
+    user-select: none;
+}
+.pp-st-table thead th.pp-st-clickable:hover {
+    outline: 1px solid #2b7fd4;
+    outline-offset: -1px;
+}
