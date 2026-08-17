@@ -24,6 +24,48 @@ def fetch_bq_contract_data(
 
     return client.query(query).to_dataframe()
 
+# Player stats now come from the derived livexy aggregate ``d_agg_player_match``
+# (typed, one row per player-match) instead of the retired ``player-match-stats``
+# table. That aggregate is keyed only by gameId/teamId/playerId, so the
+# competition/season/round and team-name columns the app relies on are recovered
+# by joining to ``fixtures`` on gameId. A few columns have no home in the new
+# pipeline and are resolved here instead of read from the table.
+PLAYER_MATCH_TABLE = "`rugbaleeg.statsperform.d_agg_player_match`"
+FIXTURES_TABLE = "`rugbaleeg.statsperform.fixtures`"
+
+
+def _team_side(col: str) -> str:
+    """Pick the home/away variant of a team column based on the player's team."""
+    return (
+        f"CASE WHEN p.teamId = f.home_teamId "
+        f"THEN f.home_{col} ELSE f.away_{col} END"
+    )
+
+
+# Requested columns that are not stored on d_agg_player_match: recovered from
+# fixtures, computed, or blanked where the livexy pipeline no longer carries them.
+_PLAYER_STAT_EXPR = {
+    "competitionName": "f.competitionName",
+    "seasonId": "f.seasonId",
+    "roundId": "f.roundId",
+    "roundName": "f.roundName",
+    "teamName": _team_side("teamName"),
+    "teamNickName": _team_side("teamNickName"),
+    "teamAbbr": _team_side("teamAbbr"),
+    # No source in the new pipeline — kept as blank columns for now.
+    "teamHexColour": "CAST(NULL AS STRING)",
+    "teamHexColour2": "CAST(NULL AS STRING)",
+}
+
+
+def _player_select(stats: list[str]) -> str:
+    """Build the SELECT list, aliasing every column back to its stat key so the
+    resulting DataFrame keeps the exact column names the app expects."""
+    return ", ".join(
+        f"{_PLAYER_STAT_EXPR.get(s, f'p.{s}')} AS `{s}`" for s in stats
+    )
+
+
 def fetch_bq_player_data(
     client: bigquery.Client,
     comps: list[int],
@@ -32,10 +74,12 @@ def fetch_bq_player_data(
 ) -> pd.DataFrame:
 
     query = f"""
-        SELECT {', '.join(stats)}
-        FROM `rugbaleeg.statsperform.player-match-stats`
-        WHERE competitionId IN UNNEST(@comps)
-          AND seasonId IN UNNEST(@seasons)
+        SELECT {_player_select(stats)}
+        FROM {PLAYER_MATCH_TABLE} p
+        JOIN {FIXTURES_TABLE} f ON p.gameId = f.gameId
+        WHERE f.competitionId IN UNNEST(@comps)
+          AND f.seasonId IN UNNEST(@seasons)
+          AND p.playerId != 0
     """
 
     job_config = bigquery.QueryJobConfig(
@@ -101,10 +145,12 @@ def fetch_bq_game_summary(
 ) -> pd.DataFrame:
 
     query = f"""
-        SELECT {', '.join(GAME_SUMMARY_STATS)}
-        FROM `rugbaleeg.statsperform.player-match-stats`
-        WHERE gameId = @game_id
-        ORDER BY teamName, shirtNum
+        SELECT {_player_select(GAME_SUMMARY_STATS)}
+        FROM {PLAYER_MATCH_TABLE} p
+        JOIN {FIXTURES_TABLE} f ON p.gameId = f.gameId
+        WHERE p.gameId = @game_id
+          AND p.playerId != 0
+        ORDER BY `teamName`, `shirtNum`
     """
 
     param_type = "STRING" if isinstance(game_id, str) else "INT64"

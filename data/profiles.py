@@ -7,8 +7,8 @@ comparison pools; it reads them.
 
 What it still computes locally is only the per-player, non-comparative views:
 * the nearest-neighbour ranking, from the pool's stored standardised measures;
-* the development time series and match log, from raw ``player-match-stats``
-  rows (inherently per match).
+* the development time series and match log, from per-match player rows
+  (``d_agg_player_match``, inherently per match).
 
 All methodology/config lives in ``profile_config.py``.
 """
